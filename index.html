@@ -6567,7 +6567,16 @@ function findProtonAcceptorAtom(mol) {
       continue;
     }
     if (!hasLonePair) continue;
-    if (a.symbol === 'N') return a;
+    if (a.symbol === 'N') {
+      // v10.73 (hittat vid genomspelning av Reaktionskapplöpningen): ett
+      // fritt par på ett neutralt kväve räckte, så även N≡N blev bas - en
+      // fri H⁺ från HCl/HF gjorde kvävgas till N2H⁺ och N2H2²⁺, och uppdragets
+      // spärr (som väntar på N2) öppnade aldrig. Samma fel som CO₂ i v10.59:
+      // N₂ (och N≡N i lustgas) protoneras bara av superstarka syror. Kvar som
+      // baser är kväve med enbart enkelbindningar - ammoniak och aminer.
+      if (mol.bonds.some(bd => (bd.a === a || bd.b === a) && bd.order > 1)) continue;
+      return a;
+    }
     if (a.symbol === 'O' && NEUTRAL_O_PROTON_ACCEPTORS.includes(formula)) return a;
   }
   return null;
@@ -7761,6 +7770,13 @@ function triggerActivationEnergyReaction() {
   const productStr = Object.keys(prodCounts).sort()
     .map(f => (prodCounts[f] > 1 ? prodCounts[f] + '×' : '') + f).join(' + ');
   logReaction('⚡ ' + reactantStr + ' → ' + productStr);
+  // v10.73: kolla uppdragets spärr DIREKT, medan produkterna finns exakt som
+  // förutsagt. Annars sker första kontrollen först vid nästa 6:e bildruta
+  // (updateScenarioGate i loop()) - och en stark syra som HCl hann ibland
+  // protolyseras mot vattnet innan dess (särskilt i 4× fart eller på en
+  // långsam dator). Cl⁻ tar aldrig tillbaka protonen, så Reaktionskapplöpningens
+  // spärr (som kräver 2 HCl) kunde då aldrig öppnas.
+  updateScenarioGate();
 }
 
 // v9.2.1: IUPAC-ordning för kemiska formler (pseudoelektronegativitet):
