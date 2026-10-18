@@ -1907,7 +1907,11 @@ const SCENARIOS = [
 
       { type: 'info',
         setup: { clear: true, show: ['N', 'H'] },
-        text: 'Sista steget: bygg <strong>ammoniak (NH<sub>3</sub>)</strong> själv. Kväve och väte går nu att välja i atompanelen.' },
+        // v10.73 FIX (användarrapport): texten sa "bygg själv ... går nu att
+        // välja", men steget (info) och nästa (förutsägelsen) har låst
+        // placering - först byggsteget öppnar. Eleven klickade i rummet utan
+        // att något hände. Texten lovar nu inte mer än steget tillåter.
+        text: 'Sista delen: <strong>ammoniak (NH<sub>3</sub>)</strong>, som du ska få bygga själv. Kväve och väte har lagts till i atompanelen - men först en förutsägelse.' },
 
       { type: 'question',
         text: 'Kväve binder tre väteatomer och har <strong>ett fritt elektronpar</strong> kvar - fyra elektronpar totalt, precis som runt syret i vatten. Vilken form får ammoniak?',
@@ -3820,6 +3824,7 @@ function enterScenarioFreePlay() {
   // för resten av uppdraget, vilket vore motsatsen till avsikten.
   simPaused = false;
   scenarioFreePlay = true; // v10.50: egen flagga - fri lek är inte ett "steg"
+  updateGridInstruction(); // v10.73: fri lek öppnar placeringen
   updateScenarioGoals();
 }
 
@@ -4321,6 +4326,7 @@ function exitScenario() {
   scenarioActionDone = false;
   scenarioFreePlay = false;
   scenarioGateLatched = false;
+  updateGridInstruction(); // v10.73: släpp ev. "kan inte placeras"-raden
   const panel = document.getElementById('scenario-panel');
   if (panel) panel.style.display = 'none';
   updateScenarioGoals(); // v10.48: döljer mål-checklistan (activeScenario är null nu)
@@ -4418,6 +4424,7 @@ function goToScenarioStep(idx) {
   // avgörs uteslutande av stegets `placement` (se scenarioAllowsPlacement).
   simPaused = stepPause(step);
   applyStepSetup(step);
+  updateGridInstruction(); // v10.73: raden ska spegla stegets placeringslås
   renderScenarioStep();
 }
 
@@ -5327,7 +5334,13 @@ function estimateBondEnergy(symA, symB, order) {
 function updateGridInstruction() {
   const instr = document.getElementById('grid-instruction');
   if (!instr) return;
-  if (trackMode) {
+  if (!scenarioAllowsPlacement()) {
+    // v10.73: ett steg med låst placering sväljer klicket i rummet tyst
+    // (mousedown-spärren) - raden fick tidigare stå kvar på "Valt: ... -
+    // klicka i rummet", en instruktion som inte gick att följa (VSEPR steg
+    // 11-12, användarrapport). Uppdateras vid varje stegbyte (goToScenarioStep).
+    instr.innerText = 'Atomer kan inte placeras i det här steget';
+  } else if (trackMode) {
     // v10.56: spårläget sväljer klicket i rummet - raden fick tidigare stå
     // kvar på "klicka i rummet för att placera", alltså en instruktion som
     // inte gick att följa.
