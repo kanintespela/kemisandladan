@@ -1,0 +1,3738 @@
+<!DOCTYPE html>
+<!-- © 2026 Christian Broselid. All rights reserved. -->
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindningsverkstan 0.13</title>
+<script id="tema-start">
+  // Tema före första ritningen, så att sidan inte blinkar till i fel tema.
+  // Ett sparat val (temaknappen) gäller i alla kemiappar på webbplatsen;
+  // utan sparat val följer appen datorns inställning.
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('kemiappar-tema'); } catch (e) {}
+    if (t !== 'ljust' && t !== 'morkt') t = matchMedia('(prefers-color-scheme: light)').matches ? 'ljust' : 'morkt';
+    document.documentElement.dataset.tema = t;
+  })();
+</script>
+<style>
+  :root {
+    --bg:        #080c10;
+    --bg2:       #0d1520;
+    --bg3:       #111e2e;
+    --border:    #1e3a52;
+    --accent:    #00d4ff;
+    --accent2:   #00ff9d;
+    --warm:      #ff9f43;
+    --danger:    #ef4444;
+    --sys:       #00d4ff;
+    --surr:      #ffb347;
+    --text:      #c8dce8;
+    --text-dim:  #6f8fa0;
+    --font-mono: 'Courier New', monospace;
+    --font-ui:   system-ui, sans-serif;
+    /* Färger som bara ritas med skript (canvas och svg). */
+    --att:       #5aa9ff;
+    --ner:       #2ecc71;
+    --stark:     #ffffff;
+    --kontur:    #080c10;
+    --dim2:      #8899a6;
+    --elektron:  #ffd166;
+    --moln-inre: #e6f0ff;
+    --moln-yttre: #7896be;
+    --delta-plus: #ff7878;
+    --delta-minus: #8cb4ff;
+    --energi-ut: #6eaaff;
+    --energi-noll: #aab4be;
+    --hjalplinje: #2a4a62;
+    --metallkant: #3d5a73;
+    --vald-bg:   #0b2a3a;
+    --skymning:  rgba(0,0,0,0.6);
+    color-scheme: dark;
+  }
+  /* Ljust tema: samma roller, mörkare accenter så att de syns mot vitt. */
+  :root[data-tema="ljust"] {
+    --bg:        #eef2f6;
+    --bg2:       #ffffff;
+    --bg3:       #e6edf3;
+    --border:    #bccbd7;
+    --accent:    #0072a3;
+    --accent2:   #00805a;
+    --warm:      #b45309;
+    --danger:    #c62828;
+    --sys:       #0072a3;
+    --surr:      #b45309;
+    --text:      #18252f;
+    --text-dim:  #52687a;
+    --att:       #1f6fd1;
+    --ner:       #1e8e4e;
+    --stark:     #10202c;
+    --kontur:    #ffffff;
+    --dim2:      #5d7080;
+    --elektron:  #c99400;
+    --moln-inre: #dbe8f8;
+    --moln-yttre: #5a7fb0;
+    --delta-plus: #c62828;
+    --delta-minus: #1f5fc0;
+    --energi-ut: #1f6fd1;
+    --energi-noll: #6b7a87;
+    --hjalplinje: #b4c4d0;
+    --metallkant: #8fa5b6;
+    --vald-bg:   #dcedf6;
+    --skymning:  rgba(20,35,50,0.4);
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    line-height: 1.45;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 18px;
+    color: var(--accent);
+    margin-right: 18px;
+    letter-spacing: 0.5px;
+  }
+  .flik {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 7px 14px;
+    font: inherit;
+    cursor: pointer;
+  }
+  .flik:hover { color: var(--text); border-color: var(--border); }
+  .flik.aktiv { color: var(--bg); background: var(--accent); font-weight: 600; }
+  main { flex: 1; padding: 14px 16px; }
+  .vy { display: none; }
+  .vy.aktiv { display: block; }
+
+  button.knapp {
+    background: var(--bg3);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font: inherit;
+    cursor: pointer;
+    min-height: 38px;
+  }
+  button.knapp:hover:not(:disabled) { border-color: var(--accent); }
+  button.knapp:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.knapp.primar { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+  button.knapp.vald { border-color: var(--accent); color: var(--accent); background: var(--vald-bg); }
+  :focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .panel h2 { font-size: 15px; color: var(--accent); margin-bottom: 8px; }
+  .panel h3 { font-size: 14px; margin: 10px 0 6px; }
+  .dim { color: var(--text-dim); font-size: 13px; }
+  .rad { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  /* ---------- Startskärm ---------- */
+  .start { max-width: 1100px; margin: 10px auto; }
+  .start p.ingress { font-size: 17px; margin-bottom: 18px; max-width: 760px; }
+  .kort-rad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .kort {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    cursor: pointer;
+    text-align: left;
+    color: var(--text);
+    font: inherit;
+  }
+  .kort:hover { border-color: var(--accent); }
+  .kort .nr { color: var(--accent); font-family: var(--font-mono); font-size: 13px; }
+  .kort h2 { font-size: 18px; margin: 4px 0 8px; }
+  .kort p { color: var(--text-dim); }
+
+  /* ---------- Modul 1 ---------- */
+  .m1 { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; }
+  .m1-vanster, .m1-hoger { display: flex; flex-direction: column; gap: 12px; }
+  .m1-del { display: none; }
+  .m1-del.aktiv { display: block; }
+  .fraga.m1-del.aktiv { display: block; }
+  #m1-kov-bild { height: 250px; cursor: grab; }
+  #m1-jon-bild { height: 370px; cursor: grab; }
+  #m1-kov-bild.drar, #m1-jon-bild.drar { cursor: grabbing; }
+  #m1-graf { height: 210px; }
+  .m1 .reglage { width: 100%; accent-color: var(--accent); height: 28px; cursor: pointer; }
+  .m1 .reglage:disabled { opacity: 0.4; cursor: not-allowed; }
+  .att { color: var(--att); }
+  .rep { color: var(--danger); }
+  .krafter { display: grid; grid-template-columns: auto 1fr 1fr; gap: 3px 10px; margin-top: 10px; font-size: 13px; }
+  .krafter .tal { font-family: var(--font-mono); text-align: right; }
+  .krafter .rubrik { color: var(--text-dim); text-align: right; }
+  .krafter .ord { grid-column: 1 / -1; color: var(--text-dim); }
+
+  /* ---------- Modul 2 ---------- */
+  .m2 { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; }
+  .m2-vanster { display: flex; flex-direction: column; gap: 12px; }
+  .duk-ram { position: relative; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .duk-ram canvas { display: block; width: 100%; }
+  #m2-atomer { height: 300px; cursor: grab; }
+  #m2-atomer.drar { cursor: grabbing; }
+  #m2-kurva { height: 190px; }
+  .m2-uppdrag .uppgifter { columns: 2; column-gap: 24px; }
+  .m2-uppdrag .uppgifter li { break-inside: avoid; }
+  .duk-etikett { position: absolute; top: 6px; left: 8px; font-size: 13px; color: var(--text-dim); pointer-events: none;
+    background: color-mix(in srgb, var(--bg2) 85%, transparent); padding: 2px 6px; border-radius: 4px; }
+  .m2-hoger { display: flex; flex-direction: column; gap: 12px; }
+  .konto { display: flex; gap: 14px; justify-content: center; align-items: stretch; height: 210px; margin-top: 4px; }
+  .stapel-kol { display: flex; flex-direction: column; align-items: center; width: 110px; }
+  .stapel-falt { position: relative; flex: 1; width: 56px; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  .nollinje { position: absolute; left: -8px; right: -8px; top: 50%; border-top: 1px dashed var(--text-dim); }
+  .stapel { position: absolute; left: 4px; right: 4px; transition: none; border-radius: 2px; }
+  .stapel-varde { font-family: var(--font-mono); font-size: 13px; margin-top: 4px; }
+  /* Lika hög i båda kolumnerna även när en etikett radbryts, så att nollinjerna ligger i jämnhöjd. */
+  .stapel-namn { font-size: 13px; font-weight: 600; margin-bottom: 4px; text-align: center; min-height: 58px; }
+  .enhet { font-size: 12px; margin-top: 6px; text-align: center; }
+  .summa { text-align: center; font-family: var(--font-mono); font-size: 13px; margin-top: 8px; color: var(--text-dim); }
+  .uppgifter { list-style: none; }
+  .uppgifter li { padding: 5px 0 5px 26px; position: relative; font-size: 14px; }
+  .uppgifter li::before { content: '○'; position: absolute; left: 4px; color: var(--text-dim); }
+  .uppgifter li.klar::before { content: '✓'; color: var(--accent2); }
+  .uppgifter li.klar { color: var(--text-dim); }
+  .fundera li::before { content: '?'; color: var(--accent); font-weight: 700; }
+  .meddelande { min-height: 44px; font-size: 14px; padding: 8px 10px; border-radius: 6px; background: var(--bg3); }
+  .meddelande.bra { border-left: 3px solid var(--accent2); }
+  .meddelande.obs { border-left: 3px solid var(--warm); }
+  .fraga { background: var(--bg3); border: 1px solid var(--warm); border-radius: 8px; padding: 10px; }
+  .fraga p { margin-bottom: 8px; font-size: 14px; }
+  .vaxel { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .vaxel button { border: 0; border-radius: 0; }
+  .install { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
+  .install > span { font-size: 14px; color: var(--text-dim); }
+  .install .vaxel { justify-self: start; }
+  .install .knapp { padding: 5px 8px; min-height: 34px; font-size: 13px; white-space: nowrap; }
+  .install > span { font-size: 13px; }
+  .kryss { display: flex; flex-direction: column; gap: 2px; }
+
+  /* ---------- Modul 3 ---------- */
+  .m3 { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; }
+  #m3-moln { height: 280px; }
+  .reglage-rad { margin-top: 14px; }
+  .reglage-rad input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; cursor: pointer; }
+  .kontinuum { position: relative; height: 26px; border-radius: 6px; margin-top: 22px;
+    background: linear-gradient(90deg, #2f80ed 0%, #8e5bd6 45%, #ff9f43 100%); }
+  .kontinuum-markor { position: absolute; top: -5px; width: 4px; height: 36px; background: #fff; border-radius: 2px; transform: translateX(-2px); box-shadow: 0 0 6px #000; }
+  .kontinuum-ord { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+  .grans { position: absolute; top: -6px; bottom: -6px; border-left: 2px dashed #fff; opacity: 0.8; display: none; }
+  .grans span { position: absolute; top: -18px; left: 4px; font-size: 12px; white-space: nowrap; color: var(--text); }
+  .visa-granser .grans { display: block; }
+  .forval { margin-top: 14px; }
+  .forval button { font-family: var(--font-mono); }
+  .stor-siffra { font-size: 28px; font-family: var(--font-mono); color: var(--accent); }
+
+  /* ---------- Modul 4 ---------- */
+  .m4 { display: grid; grid-template-columns: 250px minmax(0, 1fr) 300px; gap: 14px; }
+  .kloss {
+    display: block;
+    width: 100%;
+    text-align: left;
+    margin-bottom: 8px;
+    padding: 10px 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .kloss:hover:not(.lagd) { border-color: var(--accent); }
+  .kloss .formel { display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  .kloss.lagd { opacity: 0.35; cursor: default; border-left-color: var(--text-dim); }
+  .kloss.vald { border-color: var(--warm); border-left-color: var(--warm); }
+  /* Mittkolumnen är exakt lika hög som fönstret under rubrikraden; trappan tar
+     det utrymme som blir över när illustrationen och bildtexten fått sitt. Båda
+     SVG:erna skalas med bevarade proportioner så att de ryms på både bredd och höjd. */
+  .m4-mitt { display: flex; flex-direction: column; height: calc(100vh - var(--rubrik-h, 56px) - 28px); min-height: 520px; }
+  #m4-svg { flex: 1 1 auto; min-height: 0; width: 100%; height: 100%; display: block; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; }
+  #m4-svg.gissar { cursor: crosshair; }
+  #m4-scen { flex: 0 0 auto; width: 100%; height: clamp(140px, 24vh, 230px); display: block; margin-top: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; }
+  .scen-text { flex: 0 0 auto; font-size: 14px; margin-top: 6px; min-height: 40px; }
+  .logg { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .logg td, .logg th { padding: 4px 4px; border-bottom: 1px solid var(--border); text-align: right; }
+  .logg td:first-child, .logg th:first-child { text-align: left; }
+  .logg th { color: var(--text-dim); font-weight: normal; }
+
+  /* ---------- Modul 5 ---------- */
+  .m5 { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; }
+  .m5-vanster, .m5-hoger { display: flex; flex-direction: column; gap: 12px; }
+  .m5-del { display: none; }
+  .m5-del.aktiv { display: block; }
+  #m5-hav-bild { height: 430px; }
+  #m5-bojd-bild { height: 400px; }
+  .m5 .reglage { width: 100%; accent-color: var(--accent); height: 28px; cursor: pointer; }
+  .m5 .reglage:disabled { opacity: 0.4; cursor: not-allowed; }
+  #m5-hav-siffror, #m5-bojd-siffror { grid-template-columns: minmax(0, 1fr) auto; }
+  .krafter .tal { white-space: nowrap; }
+  .staplar { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px; align-items: center; font-size: 13px; margin-top: 6px; }
+  .staplar .ram { height: 12px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .staplar .fyll { height: 100%; background: var(--text-dim); }
+  .staplar .aktiv .fyll, .staplar .fyll.aktiv { background: var(--accent); }
+  .staplar .tal { font-family: var(--font-mono); text-align: right; }
+
+  /* ---------- Hjälp ---------- */
+  .hjalp-knapp { margin-left: auto; }
+  .modal-bak { position: fixed; inset: 0; background: var(--skymning); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-bak.oppen { display: flex; }
+  .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; max-width: 640px; width: calc(100% - 32px); max-height: 85vh; overflow: auto; padding: 18px 22px; }
+  .modal h2 { color: var(--accent); margin-bottom: 10px; }
+  .modal h3 { margin: 12px 0 4px; font-size: 15px; }
+  .modal p, .modal li { font-size: 14px; }
+  .modal ul { padding-left: 20px; }
+
+  /* ---------- Tema och länken till alla appar ---------- */
+  .hem-lank {
+    color: var(--text-dim); text-decoration: none; font-size: 13px; white-space: nowrap;
+    padding: 6px 9px; border: 1px solid var(--border); border-radius: 6px;
+  }
+  .hem-lank:hover { color: var(--text); border-color: var(--accent); }
+  .tema-knapp {
+    background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+    width: 38px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; flex: none;
+  }
+  .tema-knapp:hover { border-color: var(--accent); }
+  .tema-knapp svg { width: 18px; height: 18px; }
+  :root[data-tema="ljust"] .tema-knapp .ikon-sol, :root:not([data-tema="ljust"]) .tema-knapp .ikon-mane { display: none; }
+
+  /* Färgord i texten som följer temat (nettopilen är vit i mörkt tema, svart i ljust). */
+  :root[data-tema="ljust"] .bara-morkt, :root:not([data-tema="ljust"]) .bara-ljust { display: none; }
+
+  @media (max-width: 1100px) {
+    .m1, .m2, .m3, .m5 { grid-template-columns: 1fr; }
+    .m4 { grid-template-columns: 220px minmax(0, 1fr); }
+    .m4 .m4-hoger { grid-column: 1 / -1; }
+    .m4-mitt { height: auto; min-height: 0; }
+    #m4-svg { height: auto; }
+    .kort-rad { grid-template-columns: 1fr 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="hem-lank" href="../" title="Alla kemiappar">← Alla appar</a>
+  <h1>Bindningsverkstan</h1>
+  <button class="flik aktiv" data-vy="start">Start</button>
+  <button class="flik" data-vy="m1">1 · Krafterna</button>
+  <button class="flik" data-vy="m2">2 · Dra ihop atomerna</button>
+  <button class="flik" data-vy="m3">3 · Elektronegativitet</button>
+  <button class="flik" data-vy="m4">4 · Energitrappan</button>
+  <button class="flik" data-vy="m5">5 · Metallbindning</button>
+  <button class="knapp hjalp-knapp" id="hjalp-knapp">Hjälp</button>
+  <button class="tema-knapp" id="tema-knapp" type="button" aria-label="Byt tema" title="Byt tema">
+    <svg class="ikon-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="ikon-mane" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z" fill="currentColor"/></svg>
+  </button>
+</header>
+
+<main>
+
+<!-- ================= STARTSKÄRM ================= -->
+<section class="vy aktiv" id="vy-start">
+  <div class="start">
+    <p class="ingress">Varför håller atomer ihop? Här undersöker du kemisk bindning genom att
+    först se krafterna som håller ihop atomer och joner, och sedan själv dra i atomer, skjuta
+    på ett elektronmoln, bygga en energitrappa och följa elektronerna i en metall.</p>
+    <div class="kort-rad">
+      <button class="kort" data-ga="m1">
+        <span class="nr">MODUL 1</span>
+        <h2>Krafterna</h2>
+        <p>Attraktion och repulsion mellan två atomer, och mellan jonerna i en saltkristall. Var tar de ut varandra?</p>
+      </button>
+      <button class="kort" data-ga="m2">
+        <span class="nr">MODUL 2</span>
+        <h2>Dra ihop atomerna</h2>
+        <p>Dra två atomer mot varandra: väte, syre eller kväve. Vart tar energin vägen när en bindning bildas?</p>
+      </button>
+      <button class="kort" data-ga="m3">
+        <span class="nr">MODUL 3</span>
+        <h2>Elektronegativitet</h2>
+        <p>Dra i ett reglage och se elektronparet glida från delat till nästan överlämnat.</p>
+      </button>
+      <button class="kort" data-ga="m4">
+        <span class="nr">MODUL 4</span>
+        <h2>Energitrappan</h2>
+        <p>Ta dig från natrium och klorgas till en saltkristall, steg för steg. Gissa först var du hamnar.</p>
+      </button>
+      <button class="kort" data-ga="m5">
+        <span class="nr">MODUL 5</span>
+        <h2>Metallbindning</h2>
+        <p>Följ elektronerna i en metall, koppla in ett batteri och böj metallen. Varför spricker den inte som salt?</p>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MODUL 1 ================= -->
+<section class="vy" id="vy-m1">
+  <div class="m1">
+    <div class="m1-vanster">
+      <div class="panel rad" style="justify-content:space-between">
+        <div class="vaxel" id="m1-delar">
+          <button class="knapp vald" data-del="kov">Kovalent bindning: två atomer</button>
+          <button class="knapp" data-del="jon">Jonbindning: en kristall</button>
+        </div>
+        <div class="vaxel" id="m1-visa">
+          <button class="knapp vald" data-visa="kraft">Kraft</button>
+          <button class="knapp" data-visa="energi">Energi</button>
+        </div>
+      </div>
+      <div class="duk-ram m1-del kov aktiv">
+        <canvas id="m1-kov-bild" tabindex="0" aria-label="Två atomer med kraftpilar. Dra en atom med musen eller använd piltangenterna."></canvas>
+        <div class="duk-etikett">Dra en atom (eller ← →). <span class="att">Blå pil: attraktion.</span> <span class="rep">Röd pil: repulsion.</span> <span class="bara-morkt">Vit</span><span class="bara-ljust">Svart</span> pil: nettokraft.</div>
+      </div>
+      <div class="duk-ram m1-del jon">
+        <canvas id="m1-jon-bild" tabindex="0" aria-label="Ett snitt genom en natriumkloridkristall. Klicka på en jon för att se krafterna på den, eller dra den ur sitt läge."></canvas>
+        <div class="duk-etikett">Klicka på en jon, eller dra den ur sitt läge och släpp. <span class="att">Blå: attraktion.</span> <span class="rep">Röd: repulsion.</span> <span class="bara-morkt">Vit</span><span class="bara-ljust">Svart</span>: nettokraft.</div>
+      </div>
+      <div class="duk-ram">
+        <canvas id="m1-graf"></canvas>
+        <div class="duk-etikett" id="m1-graf-etikett"></div>
+      </div>
+    </div>
+    <div class="m1-hoger">
+      <div class="panel m1-del kov aktiv">
+        <div class="install">
+          <span>Molekyl</span>
+          <div class="vaxel" id="m1-amnen">
+            <button class="knapp vald" data-amne="H2">H₂</button>
+            <button class="knapp" data-amne="O2">O₂</button>
+            <button class="knapp" data-amne="N2">N₂</button>
+          </div>
+          <span>Avstånd</span>
+          <input type="range" class="reglage" id="m1-kov-r" min="30" max="400" step="1" value="120" aria-label="Avstånd mellan kärnorna i pm">
+        </div>
+        <div class="krafter" id="m1-kov-krafter"></div>
+      </div>
+      <div class="panel m1-del jon">
+        <div class="install">
+          <span>Jonavstånd</span>
+          <input type="range" class="reglage" id="m1-jon-d" min="220" max="380" step="1" value="282" aria-label="Avstånd mellan jonerna i pm">
+          <span>Övre lagret</span>
+          <input type="range" class="reglage" id="m1-forskjut" min="0" max="100" step="1" value="0" aria-label="Förskjutning av det övre lagret i procent av ett steg" disabled>
+        </div>
+        <div class="rad" style="margin-top:8px">
+          <button class="knapp" id="m1-slapp" disabled>Släpp lagret</button>
+          <button class="knapp" id="m1-jon-om">Börja om</button>
+        </div>
+        <div class="krafter" id="m1-jon-krafter"></div>
+      </div>
+      <div class="meddelande" id="m1-meddelande">Dra i en atom och se hur pilarna ändras.</div>
+      <div class="fraga m1-del jon" id="m1-fraga">
+        <p><b>Förutsäg först:</b> det övre lagret skjuts ett helt steg åt sidan och släpps. Vad händer?</p>
+        <div class="rad">
+          <button class="knapp" id="m1-gissa-haller">Kristallen håller ihop</button>
+          <button class="knapp" id="m1-gissa-spricker">Kristallen spricker</button>
+        </div>
+      </div>
+      <div class="panel m1-del kov aktiv">
+        <h2>Uppdrag</h2>
+        <ol class="uppgifter" id="m1-kov-uppdrag">
+          <li data-id="jamvikt">Hitta avståndet där attraktion och repulsion är lika stora.</li>
+          <li data-id="tryck">Tryck ihop atomerna till ungefär 60 % av jämviktsavståndet du hittade. Vilken pil växer snabbast?</li>
+          <li data-id="dra">Dra isär dem till dubbla jämviktsavståndet. Vad händer med pilarna?</li>
+          <li data-id="n2">Byt till N₂ och hitta jämvikten igen. Är krafterna starkare eller svagare än i H₂?</li>
+          <li data-id="forklara">Förklara för en kamrat: vad skulle hända med en molekyl som bara hade attraktion?</li>
+        </ol>
+      </div>
+      <div class="panel m1-del jon">
+        <h2>Uppdrag</h2>
+        <ol class="uppgifter" id="m1-jon-uppdrag">
+          <li data-id="inne">Klicka på en jon mitt i kristallen. Vart pekar nettokraften?</li>
+          <li data-id="ur">Dra en jon ur sitt läge och släpp.</li>
+          <li data-id="kant">Tryck ihop kristallen med reglaget och klicka på en jon i kanten. Vart pekar nettokraften nu?</li>
+          <li data-id="botten">Vid vilket jonavstånd är energin lägst? Dra isär och tryck ihop.</li>
+          <li data-id="lager">Förutsäg först. Skjut sedan det övre lagret ett helt steg och släpp.</li>
+          <li data-id="forklara">Förklara för en kamrat: varför spricker en saltkristall av ett slag, trots att jonerna dras starkt till varandra?</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MODUL 2 ================= -->
+<section class="vy" id="vy-m2">
+  <div class="m2">
+    <div class="m2-vanster">
+      <div class="duk-ram">
+        <canvas id="m2-atomer" tabindex="0" aria-label="Två atomer. Dra den högra atomen med musen eller använd piltangenterna."></canvas>
+        <div class="duk-etikett" id="m2-atom-etikett">Håll ned musknappen på den högra atomen och dra</div>
+      </div>
+      <div class="duk-ram">
+        <canvas id="m2-kurva"></canvas>
+        <div class="duk-etikett">Lägesenergi (kJ/mol) mot avstånd mellan atomkärnorna (pm)</div>
+      </div>
+      <div class="panel m2-uppdrag">
+        <h2>Uppdrag</h2>
+        <ol class="uppgifter" id="m2-uppdrag">
+          <li data-id="bind">Dra ihop atomerna tills systemets energi är så låg som möjligt.</li>
+          <li data-id="vagg">Tryck dem ännu närmare. Vad händer med energin?</li>
+          <li data-id="studs">Byt till <i>Knuffa och släpp</i> utan omgivning. Förutsäg först, knuffa sedan.</li>
+          <li data-id="fangad">Slå på omgivningen och knuffa igen.</li>
+          <li data-id="jamfor">Bilda H₂, O₂ och N₂. Vilken bindning är starkast? Vilken är längst?</li>
+          <li data-id="forklara">Förklara för en kamrat: varför studsar atomerna isär när det inte finns något som kan ta emot energin?</li>
+        </ol>
+      </div>
+    </div>
+    <div class="m2-hoger">
+      <div class="panel">
+        <div class="install">
+          <span>Molekyl</span>
+          <div class="vaxel" id="m2-amnen">
+            <button class="knapp vald" data-amne="H2">H₂</button>
+            <button class="knapp" data-amne="O2">O₂</button>
+            <button class="knapp" data-amne="N2">N₂</button>
+          </div>
+          <span>Läge</span>
+          <div class="vaxel">
+            <button class="knapp vald" id="m2-lage-hand">Håll och dra</button>
+            <button class="knapp" id="m2-lage-fri">Knuffa och släpp</button>
+          </div>
+          <span>Omgivning</span>
+          <div class="vaxel">
+            <button class="knapp vald" id="m2-omg-av">Av – bara atomerna</button>
+            <button class="knapp" id="m2-omg-pa">På</button>
+          </div>
+        </div>
+        <div class="rad" style="margin-top:8px">
+          <button class="knapp" id="m2-borja-om">Börja om</button>
+          <div class="kryss">
+            <label class="dim"><input type="checkbox" id="m2-hela-kurvan"> Visa hela kurvan</label>
+            <label class="dim"><input type="checkbox" id="m2-jamfor"> Jämför alla tre</label>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Energikonto</h2>
+        <div class="konto">
+          <div class="stapel-kol">
+            <div class="stapel-namn" style="color:var(--sys)">Systemet<br><span class="dim">de två atomerna</span></div>
+            <div class="stapel-falt"><div class="nollinje"></div><div class="stapel" id="m2-stapel-sys" style="background:var(--sys)"></div></div>
+            <div class="stapel-varde" id="m2-varde-sys">0</div>
+          </div>
+          <div class="stapel-kol">
+            <div class="stapel-namn" style="color:var(--surr)">Omgivningen<br><span class="dim" id="m2-omg-namn">din hand</span></div>
+            <div class="stapel-falt"><div class="nollinje"></div><div class="stapel" id="m2-stapel-omg" style="background:var(--surr)"></div></div>
+            <div class="stapel-varde" id="m2-varde-omg">0</div>
+          </div>
+        </div>
+        <div class="summa" id="m2-summa">Summa: 0 kJ/mol</div>
+        <p class="dim enhet">kJ/mol: energi för en mol, alltså 6·10²³ molekyler. pm: pikometer, en biljondels meter.</p>
+      </div>
+      <div class="meddelande" id="m2-meddelande">Dra atomerna mot varandra och håll koll på staplarna.</div>
+      <div class="fraga" id="m2-fraga" hidden>
+        <p><b>Förutsäg först:</b> du knuffar atomerna mot varandra när det inte finns något runt omkring. Vad händer?</p>
+        <div class="rad">
+          <button class="knapp" id="m2-gissa-fast">De fastnar ihop</button>
+          <button class="knapp" id="m2-gissa-studs">De studsar isär</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MODUL 3 ================= -->
+<section class="vy" id="vy-m3">
+  <div class="m3">
+    <div>
+      <div class="duk-ram">
+        <canvas id="m3-moln"></canvas>
+        <div class="duk-etikett">Det gemensamma elektronparet i bindningen</div>
+      </div>
+      <div class="panel reglage-rad">
+        <p class="dim" style="margin-bottom:8px"><b>Elektronegativitet</b> är ett mått på hur starkt en atom drar till sig elektronerna i en bindning. ΔEN är skillnaden mellan de två atomernas värden.</p>
+        <label for="m3-reglage"><b>Skillnad i elektronegativitet, ΔEN = <span id="m3-den">0,00</span></b></label>
+        <input type="range" id="m3-reglage" min="0" max="3.3" step="0.01" value="0">
+        <div class="kontinuum" id="m3-kontinuum">
+          <div class="grans" style="left:calc(0.5/3.3*100%)"><span>ca 0,5</span></div>
+          <div class="grans" style="left:calc(1.7/3.3*100%)"><span>ca 1,7</span></div>
+          <div class="kontinuum-markor" id="m3-markor"></div>
+        </div>
+        <div class="kontinuum-ord"><span>opolär kovalent</span><span>polär kovalent</span><span>jonliknande</span></div>
+        <div class="forval rad" id="m3-forval"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h2>Elektronparet</h2>
+        <p>Andel av tiden som elektronparet är hos <span id="m3-namn-b">B</span>:</p>
+        <div class="stor-siffra" id="m3-andel">50 %</div>
+        <p class="dim" style="margin-top:6px">Jonkaraktär: <span id="m3-jon">0 %</span>. Den visar hur långt paret har flyttat från lika delning (0 %) mot helt överlämnat till en atom (100 %). Värdet är Paulings uppskattning.</p>
+        <p class="dim" id="m3-not" style="margin-top:6px"></p>
+      </div>
+      <div class="panel">
+        <label class="dim"><input type="checkbox" id="m3-granser"> Visa lärobokens gränser</label>
+        <p class="dim" style="margin-top:6px">Gränserna är överenskommelser för att kunna sortera, inte något som händer i atomerna.
+        Var går de i din lärobok?</p>
+      </div>
+      <div class="panel">
+        <h2>Fundera</h2>
+        <ul class="uppgifter fundera">
+          <li>Finns det något ställe på reglaget där molnet plötsligt hoppar?</li>
+          <li>H–F räknas ofta som polär kovalent och Na–Cl som jonbindning. Hur stor är skillnaden i jonkaraktär mellan dem?</li>
+          <li>Kan elektronparet någonsin hamna till 100 % hos den ena atomen?</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MODUL 4 ================= -->
+<section class="vy" id="vy-m4">
+  <div class="m4">
+    <div class="panel">
+      <h2>Steg</h2>
+      <p class="dim" style="margin-bottom:8px">Klicka på det steg du vill ta härnäst.</p>
+      <div id="m4-hylla"></div>
+      <p class="dim" style="margin:2px 0 10px">(s) = fast form, (g) = gasform. ½ Cl₂ = en halv klormolekyl, alltså en kloratom per natriumatom.</p>
+      <label class="dim"><input type="checkbox" id="m4-gissa-pa" checked> Förutsäg varje steg</label>
+      <div style="margin-top:10px"><button class="knapp" id="m4-borja-om">Börja om</button></div>
+    </div>
+    <div class="m4-mitt">
+      <svg id="m4-svg" viewBox="0 0 720 420" role="img" aria-label="Energitrappa för bildning av natriumklorid"></svg>
+      <svg id="m4-scen" viewBox="0 0 720 170" role="img" aria-label="Illustration av ämnena efter senaste steget"></svg>
+      <p class="scen-text" id="m4-scen-text"></p>
+    </div>
+    <div class="m4-hoger" style="display:flex;flex-direction:column;gap:12px">
+      <div class="meddelande" id="m4-meddelande">Start: natriummetall och klorgas. Välj ett första steg.</div>
+      <div class="fraga" id="m4-fraga" hidden>
+        <p id="m4-fraga-text"></p>
+        <div class="rad">
+          <button class="knapp primar" id="m4-las">Lås min gissning</button>
+          <span class="dim">Piltangenter: finjustera</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Bokföring (kJ/mol)</h2>
+        <table class="logg">
+          <thead><tr><th>Steg</th><th>Ändring</th><th>Din gissning</th><th>Nivå</th></tr></thead>
+          <tbody id="m4-logg"></tbody>
+        </table>
+        <p class="dim" style="margin-top:6px">Ändring: hur mycket energin ändrades i steget. Din gissning: var du trodde att du skulle hamna. Nivå: var du hamnade. Båda räknas från start.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MODUL 5 ================= -->
+<section class="vy" id="vy-m5">
+  <div class="m5">
+    <div class="m5-vanster">
+      <div class="panel rad" style="justify-content:space-between">
+        <div class="vaxel" id="m5-delar">
+          <button class="knapp vald" data-del="hav">Elektronhavet</button>
+          <button class="knapp" data-del="bojd">Böj metallen</button>
+        </div>
+        <div class="vaxel" id="m5-metaller">
+          <button class="knapp vald" data-metall="Na">Na</button>
+          <button class="knapp" data-metall="Mg">Mg</button>
+          <button class="knapp" data-metall="Al">Al</button>
+        </div>
+      </div>
+      <div class="duk-ram m5-del hav aktiv">
+        <canvas id="m5-hav-bild" aria-label="En bit metall: atomkärnor som står still och delokaliserade valenselektroner som rör sig fritt mellan dem. Metallen kan kopplas till ett batteri och en lampa."></canvas>
+        <div class="duk-etikett" id="m5-hav-etikett"></div>
+      </div>
+      <div class="duk-ram m5-del bojd">
+        <canvas id="m5-bojd-bild" aria-label="Ett snitt genom en metall. Det övre lagret kan skjutas åt sidan med reglaget."></canvas>
+        <div class="duk-etikett">Ett snitt ur en större metallbit. <span class="bara-morkt">Vit</span><span class="bara-ljust">Svart</span> ring: märkta atomkärnor, så att du ser hur långt lagret flyttats. <span class="bara-morkt">Vit</span><span class="bara-ljust">Svart</span> pil: kraften på lagret.</div>
+      </div>
+      <div class="panel m5-del hav aktiv">
+        <h2>Fundera</h2>
+        <ul class="uppgifter fundera">
+          <li>Atomkärnorna är positiva och stöter bort varandra. Vad är det som ändå håller ihop metallen?</li>
+          <li>En saltkristall består av joner. Varför leder den inte ström, när metallen gör det?</li>
+        </ul>
+      </div>
+    </div>
+    <div class="m5-hoger">
+      <div class="panel m5-del hav aktiv">
+        <div class="rad">
+          <button class="knapp primar" id="m5-batteri">Koppla in batteriet</button>
+          <label class="dim"><input type="checkbox" id="m5-markera"> Markera en elektron</label>
+        </div>
+        <div class="krafter" id="m5-hav-siffror"></div>
+      </div>
+      <div class="panel m5-del bojd">
+        <div class="install">
+          <span>Övre lagret</span>
+          <input type="range" class="reglage" id="m5-forskjut" min="0" max="200" step="1" value="0" aria-label="Förskjutning av det övre lagret i procent av ett steg" disabled>
+        </div>
+        <div class="rad" style="margin-top:8px">
+          <button class="knapp" id="m5-slapp" disabled>Släpp lagret</button>
+          <button class="knapp" id="m5-bojd-om">Börja om</button>
+        </div>
+        <div class="krafter" id="m5-bojd-siffror"></div>
+      </div>
+      <div class="meddelande" id="m5-meddelande">De gula prickarna är valenselektronerna. Titta på hur de rör sig mellan atomkärnorna.</div>
+      <div class="fraga m5-del bojd" id="m5-fraga">
+        <p><b>Förutsäg först:</b> det övre lagret skjuts ett helt steg åt sidan och släpps. Vad händer?</p>
+        <div class="rad">
+          <button class="knapp" id="m5-gissa-haller">Metallen håller ihop</button>
+          <button class="knapp" id="m5-gissa-spricker">Metallen spricker</button>
+        </div>
+      </div>
+      <div class="panel m5-del hav aktiv">
+        <h2>Energi för att förånga metallen</h2>
+        <p class="dim">Energin som krävs för att bryta metallbindningen helt, så att atomerna blir fria (kJ/mol). För natrium är det samma +107 som steget ”Förånga natrium” i Energitrappan.</p>
+        <div class="staplar" id="m5-staplar"></div>
+      </div>
+      <div class="panel m5-del hav aktiv">
+        <h2>Uppdrag</h2>
+        <ol class="uppgifter" id="m5-hav-uppdrag">
+          <li data-id="markera">Markera en elektron. Hör den till någon särskild atom?</li>
+          <li data-id="strom">Koppla in batteriet. Vilka partiklar rör sig genom metallen, och vilka står kvar?</li>
+          <li data-id="polen">Markera en elektron med batteriet inkopplat och följ den. Vart tar den vägen, och kommer den tillbaka?</li>
+          <li data-id="jamfor">Prova natrium, magnesium och aluminium. Hur hänger antalet valenselektroner ihop med energin som krävs för att förånga metallen?</li>
+          <li data-id="forklara">Förklara för en kamrat: vad håller ihop atomerna i en metall?</li>
+        </ol>
+      </div>
+      <div class="panel m5-del bojd">
+        <h2>Uppdrag</h2>
+        <ol class="uppgifter" id="m5-bojd-uppdrag">
+          <li data-id="lager">Förutsäg först. Skjut sedan det övre lagret ett helt steg och släpp.</li>
+          <li data-id="halv">Skjut lagret ungefär ett halvt steg och släpp. Prova lite mindre och lite mer än ett halvt. Var hamnar lagret?</li>
+          <li data-id="salt">Skjut lagret i saltkristallen i modul 1 (Krafterna) ett helt steg på samma sätt. Vad är skillnaden?</li>
+          <li data-id="forklara">Förklara för en kamrat: varför går en metall att böja och hamra, medan ett salt spricker?</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<div class="modal-bak" id="hjalp">
+  <div class="modal" role="dialog" aria-labelledby="hjalp-rubrik">
+    <h2 id="hjalp-rubrik">Hjälp</h2>
+    <h3>1 · Krafterna</h3>
+    <ul>
+      <li><b>Blå pil, attraktion:</b> elektronerna mellan kärnorna drar båda kärnorna mot sig. I kristallen: joner med motsatt laddning drar i varandra.</li>
+      <li><b>Röd pil, repulsion:</b> kärnorna stöter bort varandra, och elektronmolnen stöter bort varandra när de trycks in i varandra. I kristallen: joner med samma laddning stöter bort varandra.</li>
+      <li><b><span class="bara-morkt">Vit</span><span class="bara-ljust">Svart</span> pil:</b> nettokraften, summan av de två. En ring betyder noll.</li>
+      <li><b>Två atomer:</b> dra en atom med musen, använd reglaget eller ← → (skift för större steg).</li>
+      <li><b>Kristallen:</b> klicka på en jon för att se krafterna på den. Dra den ur sitt läge och släpp. Reglaget <i>Övre lagret</i> skjuter de två översta raderna i sidled; <i>Släpp lagret</i> låter krafterna bestämma vad som händer.</li>
+      <li>Grafen visar krafterna (eller energin) mot avståndet. Kraften gäller en molekyl eller en formelenhet, i nanonewton.</li>
+    </ul>
+    <h3>2 · Dra ihop atomerna</h3>
+    <ul>
+      <li><b>Håll och dra:</b> håll ned musknappen på den högra atomen och dra. Din hand är omgivningen: den tar emot eller ger energi.</li>
+      <li><b>Knuffa och släpp:</b> dra den högra atomen åt höger som en slangbella och släpp. Pilen visar farten.</li>
+      <li>Tangentbord: klicka på atomrutan, använd ← → och mellanslag för att knuffa.</li>
+      <li><b>Omgivning på:</b> kvävemolekyler (N₂) från luften krockar med atomerna hela tiden. Siffran vid krocken visar hur mycket energi kvävemolekylen fick (+, orange) eller gav (−, blå).</li>
+      <li><b>Omgivning av:</b> det finns bara de två atomerna, inget annat och inget ljus.</li>
+      <li>Den streckade linjen i grafen är systemets totala energi.</li>
+    </ul>
+    <h3>3 · Elektronegativitet</h3>
+    <ul>
+      <li>Dra i reglaget eller klicka på ett ämnespar.</li>
+    </ul>
+    <h3>4 · Energitrappan</h3>
+    <ul>
+      <li>Klicka på ett steg. Klicka sedan i trappan där du tror att nivån hamnar och lås gissningen.</li>
+      <li>Röda pilar uppåt: energi tillförs. Gröna pilar nedåt: energi avges.</li>
+    </ul>
+    <h3>5 · Metallbindning</h3>
+    <ul>
+      <li><b>Gula prickar:</b> valenselektronerna, atomernas yttersta elektroner. De är delokaliserade: de har inte lämnat atomerna, men de delas av alla atomerna i metallen och rör sig fritt mellan dem. <b>Kloten:</b> atomkärnorna med de inre elektronerna.</li>
+      <li><b>Markera en elektron:</b> en elektron ritas större och lämnar ett spår, så att du kan se vart den tar vägen.</li>
+      <li><b>Koppla in batteriet:</b> metallen kopplas till ett batteri och en lampa. Elektronerna flyttas mot batteriets pluspol, där ett ämne i batteriet tar upp dem och reduceras. Vid minuspolen avger ett annat ämne lika många elektroner och oxideras, och de elektronerna går ut i tråden mot metallen. Ingen elektron går igenom batteriet: inne i batteriet är det joner som rör sig.</li>
+      <li><b>Böj metallen:</b> förutsäg först, skjut sedan det övre lagret med reglaget och släpp det.</li>
+      <li>Byt metall med knapparna Na, Mg och Al.</li>
+    </ul>
+    <h3>Ord och enheter</h3>
+    <ul>
+      <li><b>pm, pikometer:</b> en biljondels meter (10⁻¹² m). Atomer är några hundra pm stora.</li>
+      <li><b>mol:</b> ett bestämt antal partiklar, 6,02·10²³ stycken. Kemister räknar energi per mol.</li>
+      <li><b>kJ/mol:</b> kilojoule per mol, energin för en mol molekyler eller formelenheter.</li>
+      <li><b>nN, nanonewton:</b> en miljarddels newton. Det är storleken på kraften mellan två enskilda atomer.</li>
+      <li><b>Systemet och omgivningen:</b> systemet är det du studerar, här atomerna. Omgivningen är allt annat.</li>
+      <li><b>Jon:</b> en atom som har lämnat ifrån sig eller tagit upp elektroner och därför är laddad.</li>
+      <li><b>Elektronegativitet:</b> hur starkt en atom drar till sig elektronerna i en bindning.</li>
+      <li><b>Valenselektroner:</b> en atoms yttersta elektroner, de som deltar i bindningar.</li>
+      <li><b>(s) och (g):</b> fast form och gasform.</li>
+    </ul>
+    <p class="dim" style="margin-top:12px">Bindningsverkstan 0.12 · Christian Broselid</p>
+    <div style="margin-top:12px"><button class="knapp primar" id="hjalp-stang">Stäng</button></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// =====================================================================
+// FYSIK – rena funktioner utan DOM, så att testerna kan köra dem direkt.
+// =====================================================================
+const Fysik = (() => {
+  // --- Modul 2: Morsepotential i reducerade enheter --------------------
+  // Varje molekyl räknas i sina egna enheter: energi i D (bindningsenergin),
+  // avstånd i r0 (bindningslängden). Relativkoordinat med reducerad massa
+  // MU = 0,5. Omräkning till kJ/mol och pm sker via KJ och PM.
+  //
+  // Morseparametern a = √(k / 2D) med k = μω² ur vibrationsvågtalet ωe:
+  //   H2: 436 kJ/mol, 74 pm,  ωe 4401 cm⁻¹  →  a ≈ 1,94 Å⁻¹
+  //   O2: 498 kJ/mol, 121 pm, ωe 1580 cm⁻¹  →  a ≈ 2,67 Å⁻¹
+  //   N2: 945 kJ/mol, 110 pm, ωe 2359 cm⁻¹  →  a ≈ 2,71 Å⁻¹
+  // vdw = van der Waals-radien (pm), som bestämmer hur stora atomerna ritas.
+  const AMNEN = {
+    H2: { id: 'H2', namn: 'H₂', sym: 'H', bindning: 'enkelbindning', D: 436, r0: 74, a: 1.94, we: 4401, vdw: 120 },
+    O2: { id: 'O2', namn: 'O₂', sym: 'O', bindning: 'dubbelbindning', D: 498, r0: 121, a: 2.67, we: 1580, vdw: 152 },
+    N2: { id: 'N2', namn: 'N₂', sym: 'N', bindning: 'trippelbindning', D: 945, r0: 110, a: 2.71, we: 2359, vdw: 155 },
+  };
+  // Startavstånd, största avstånd och slangbellans längd i pm, lika för alla.
+  const START_PM = 370, MAX_PM = 414, DRAG_PM = 111;
+  const D = 1, R0 = 1, MU = 0.5;
+  const R_MIN_MAL = 0.25;
+  const K_HAND = 40, C_HAND = 5;            // handens fjäder och dämpning
+  // Omgivningen: N2-molekyler i luft vid rumstemperatur som krockar med paret
+  // hela tiden, med slumpvisa mellanrum (minst KROCK_MIN, medel KROCK_MEDEL;
+  // minsta tiden ger en molekyl tid att synligt flyga fram). Vid en krock
+  // byts energi åt det håll som för paret mot jämvikt med luften:
+  //   ny rörelseenergi = (1 − q)·KE + q·KE_N2,
+  // där KE_N2 lottas som rörelseenergin i en frihetsgrad hos en gas vid 25 °C
+  // (medel kT/2). Ett varmt par förlorar energi, ett kallt kan få lite.
+  // Krocktiderna anges för H2 och skalas med vibrationstiden i reducerade
+  // enheter (∝ 1/a·r0), så att varje molekyl får lika många krockar per svängning.
+  const KROCK_MIN_H = 0.6, KROCK_MEDEL_H = 1.2, KROCK_Q = 0.6;
+  const KE_MAX = 0.5, KE_MIN = 0.05;
+
+  // Potentialkurvan för ett valfritt ämne i kJ/mol mot pm, utan att byta aktivt ämne.
+  function vKj(id, pm) {
+    const m = AMNEN[id], am = m.a * m.r0 / 100;
+    const mo = r => { const e = Math.exp(-am * (r - 1)); return (1 - e) * (1 - e) - 1; };
+    const v0 = mo(START_PM / m.r0);
+    return (mo(pm / m.r0) - v0) * m.D / (1 + v0);
+  }
+
+  // Ämnesberoende storheter; sätts av valjAmne().
+  let amne, A, PM, V0, KJ, DJUP, KT, R_START, R_MAX, DRAG_MAX, KROCK_MIN, KROCK_MEDEL;
+
+  function morse(r) { const e = Math.exp(-A * (r - R0)); return D * ((1 - e) * (1 - e) - 1); }
+  // Nollnivån läggs vid startavståndet, så att bokföringen börjar på exakt 0.
+  // Gropens djup blir då D + morse(R_START) ≈ D; KJ skalar så att den visas
+  // som molekylens bindningsenergi.
+  function V(r) { return morse(r) - V0; }
+  function kraft(r) { const e = Math.exp(-A * (r - R0)); return -2 * D * A * (1 - e) * e; }
+
+  function valjAmne(id) {
+    amne = AMNEN[id];
+    A = amne.a * amne.r0 / 100;             // a·r0, dimensionslöst
+    PM = amne.r0;
+    R_START = START_PM / PM; R_MAX = MAX_PM / PM; DRAG_MAX = DRAG_PM / PM;
+    V0 = morse(R_START);
+    DJUP = D + V0;
+    KJ = amne.D / DJUP;
+    KT = 2.479 / KJ;                        // kT vid 298 K (2,48 kJ/mol) i reducerade enheter
+    const skala = AMNEN.H2.a * AMNEN.H2.r0 / (amne.a * amne.r0);
+    KROCK_MIN = KROCK_MIN_H * skala; KROCK_MEDEL = KROCK_MEDEL_H * skala;
+    Object.assign(api, { amne, A, PM, V0, KJ, DJUP, KT, R_START, R_MAX, DRAG_MAX, KROCK_MIN, KROCK_MEDEL });
+  }
+  // Hur många reducerade tidsenheter som spelas upp per sekund. Verklig
+  // vibrationsfrekvens ger H2 > N2 > O2; ordningen bevaras men skillnaden
+  // komprimeras (exponent 0,7) så att tunga molekyler inte blir sega att se på.
+  function tidsskala(id) {
+    const m = AMNEN[id], h = AMNEN.H2;
+    const kvot = (m.we / h.we) * (h.a * h.r0) / (m.a * m.r0);
+    return 3 * Math.pow(kvot, 0.7);
+  }
+
+  // Slumptal med frö (mulberry32), så att testerna blir reproducerbara.
+  let fro = (Date.now() ^ 0x9e3779b9) >>> 0;
+  function sattFro(n) { fro = n >>> 0; }
+  function slump() {
+    fro = (fro + 0x6D2B79F5) >>> 0;
+    let t = fro;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  function vantetid() { return KROCK_MIN - (KROCK_MEDEL - KROCK_MIN) * Math.log(1 - slump()); }
+  // Rörelseenergi i en frihetsgrad hos en gas med temperaturen kT: (kT/2)·z², z ~ N(0,1).
+  function luftensEnergi() {
+    const z = Math.sqrt(-2 * Math.log(1 - slump())) * Math.cos(2 * Math.PI * slump());
+    return 0.5 * KT * z * z;
+  }
+
+  // Nästa krocks tid och luftmolekylens energi lottas i förväg, så att
+  // gränssnittet kan räkna ut exakt när och var krocken sker.
+  function nyttPar(r = R_START, v = 0) {
+    return { r, v, omg: 0, tid: 0, nastaKrock: vantetid(), nastaLuft: luftensEnergi(), senasteKrock: 0, krockar: 0 };
+  }
+  function systemEnergi(p) { return 0.5 * MU * p.v * p.v + V(p.r); }
+  // En krock med en luftmolekyl som har rörelseenergin keLuft. Returnerar den
+  // energi som gick till omgivningen (negativ om paret fick energi).
+  function krock(p, q, keLuft) {
+    const ke = 0.5 * MU * p.v * p.v;
+    const keNy = (1 - q) * ke + q * keLuft;
+    const tecken = p.v !== 0 ? Math.sign(p.v) : (keLuft > 0 ? 1 : 0);
+    p.v = tecken * Math.sqrt(2 * keNy / MU);
+    const dE = ke - keNy;
+    p.omg += dE;
+    return dE;
+  }
+
+  // Ett tidssteg (velocity Verlet). o = { hand: bool, mal, omgivning: bool }
+  // Energi som lämnar systemet bokförs exakt på p.omg; det handen tillför dras av.
+  function steg(p, dt, o) {
+    const ext = r => o.hand ? K_HAND * (o.mal - r) : 0;
+    const rGammal = p.r;
+    p.v += 0.5 * dt * (kraft(p.r) + ext(p.r)) / MU;
+    p.r += dt * p.v;
+    p.v += 0.5 * dt * (kraft(p.r) + ext(p.r)) / MU;
+    if (o.hand) p.omg -= K_HAND * (o.mal - 0.5 * (rGammal + p.r)) * (p.r - rGammal);
+    if (o.hand) {
+      const v0 = p.v;
+      p.v *= Math.exp(-C_HAND * dt / MU);
+      p.omg += 0.5 * MU * (v0 * v0 - p.v * p.v);
+    }
+    p.tid += dt;
+    if (o.omgivning && !o.hand && p.tid >= p.nastaKrock) {
+      p.senasteKrock = krock(p, KROCK_Q, p.nastaLuft);
+      p.krockar++;
+      p.nastaKrock = p.tid + vantetid();
+      p.nastaLuft = luftensEnergi();
+    }
+  }
+  // Slangbellan: dragavstånd (reducerat) → startfart. Max 0,5 D rörelseenergi.
+  function startfart(drag) {
+    const d = Math.min(Math.max(drag, 0), DRAG_MAX) / DRAG_MAX;
+    const ke = d * KE_MAX;
+    return ke < KE_MIN ? 0 : -Math.sqrt(2 * ke / MU);
+  }
+
+  // --- Modul 4: Born–Haber för NaCl (kJ/mol) -------------------------
+  const BH_STEG = [
+    { id: 'sub', namn: 'Förånga natrium', formel: 'Na(s) → Na(g)', dH: 107 },
+    { id: 'dis', namn: 'Dela klormolekylen', formel: '½ Cl₂(g) → Cl(g)', dH: 121 },
+    { id: 'ion', namn: 'Ta en elektron från natrium', formel: 'Na(g) → Na⁺(g) + e⁻', dH: 496 },
+    { id: 'ea',  namn: 'Ge elektronen till klor', formel: 'Cl(g) + e⁻ → Cl⁻(g)', dH: -349 },
+    { id: 'lat', namn: 'Packa jonerna i ett gitter', formel: 'Na⁺(g) + Cl⁻(g) → NaCl(s)', dH: -786 },
+  ];
+  const BH_START = { na: 's', cl: 'cl2', salt: false };
+  // Returnerar null om steget går, annars en förklaring till varför inte.
+  function bhHinder(s, id) {
+    switch (id) {
+      case 'sub': return s.na === 's' ? null : 'Natriumet är redan förångat.';
+      case 'dis': return s.cl === 'cl2' ? null : 'Klormolekylen är redan delad.';
+      case 'ion':
+        if (s.na === 's') return 'Atomerna i fast natrium sitter ihop i en metall. Förånga natriumet först så att du har fria atomer.';
+        return s.na === 'g' ? null : 'Natrium har redan lämnat ifrån sig sin elektron.';
+      case 'ea':
+        if (s.cl === 'cl2') return 'Kloratomerna sitter ihop två och två. Dela klormolekylen först.';
+        if (s.cl === '-') return 'Klor har redan tagit emot en elektron.';
+        return s.na === '+' ? null : 'Det finns ingen fri elektron än. Var ska den komma ifrån?';
+      case 'lat':
+        if (s.salt) return 'Saltet är redan bildat.';
+        return s.na === '+' && s.cl === '-' ? null : 'Gittret byggs av joner. Både Na⁺ och Cl⁻ måste finnas först.';
+    }
+    return 'Okänt steg.';
+  }
+  function bhUtfor(s, id) {
+    const n = { ...s };
+    if (id === 'sub') n.na = 'g';
+    if (id === 'dis') n.cl = 'g';
+    if (id === 'ion') n.na = '+';
+    if (id === 'ea') n.cl = '-';
+    if (id === 'lat') { n.salt = true; }
+    return n;
+  }
+  function bhDH(id) { return BH_STEG.find(x => x.id === id).dH; }
+  // Ämnena på en nivå, som två rader (natriumdel, klordel).
+  function bhAmnen(s) {
+    if (s.salt) return ['NaCl(s)', ''];
+    const na = { s: 'Na(s)', g: 'Na(g)', '+': 'Na⁺(g)' }[s.na];
+    let cl = { cl2: '½ Cl₂(g)', g: 'Cl(g)', '-': 'Cl⁻(g)' }[s.cl];
+    if (s.na === '+' && s.cl !== '-') cl = 'e⁻ + ' + cl;
+    return [na, cl];
+  }
+
+  // Illustrationen under trappan: 8 Na och 4 Cl2 (= 8 Cl), dvs lika många
+  // natrium- som kloratomer. Radier i pm × 0,1 px: metallradie Na 186,
+  // jonradie Na⁺ 102, kovalent radie Cl 99 (Cl–Cl 199 pm), jonradie Cl⁻ 181.
+  // Varje partikel har ett fast id så att övergångar kan animeras.
+  const BH_R = { Na: 18.6, 'Na+': 10.2, Cl: 9.9, 'Cl-': 18.1, e: 4 };
+  const NA_GAS = [[52, 40], [122, 28], [200, 46], [278, 32], [70, 112], [150, 126], [228, 106], [292, 126]];
+  const CL2 = [[452, 46, 0.3], [604, 40, -0.4], [472, 126, -0.2], [632, 120, 0.5]];
+  const CL_GAS = [[420, 34], [502, 58], [584, 28], [664, 52], [430, 116], [522, 104], [602, 128], [684, 112]];
+  const E_MOLN = [[332, 50], [366, 38], [396, 62], [342, 86], [380, 96], [326, 122], [362, 134], [396, 114]];
+  function bhGitter(i, j) { const d = BH_R['Na+'] + BH_R['Cl-']; return [360 + (i - 1.5) * d, 85 + (j - 1.5) * d]; }
+  function bhScen(s) {
+    const p = [];
+    // Natrium
+    const naPos = [];
+    for (let k = 0; k < 8; k++) {
+      let x, y, typ = s.na === '+' ? 'Na+' : 'Na';
+      if (s.salt) {
+        const cell = k * 2, j = Math.floor(cell / 4), i = (cell % 4) + (j % 2);   // (i + j) jämnt → Na⁺
+        [x, y] = bhGitter(i, j);
+        typ = 'Na+';
+      } else if (s.na === 's') { x = 70 + (k % 4) * 35; y = 67 + Math.floor(k / 4) * 35; }
+      else [x, y] = NA_GAS[k];
+      naPos.push([x, y]);
+      p.push({ id: 'na' + k, typ, x, y, r: BH_R[typ], op: 1 });
+    }
+    // Klor
+    const clPos = [];
+    for (let k = 0; k < 8; k++) {
+      let x, y, typ = s.cl === '-' ? 'Cl-' : 'Cl';
+      if (s.salt) {
+        const cell = k * 2, j = Math.floor(cell / 4), i = (cell % 4) + 1 - (j % 2);  // (i + j) udda → Cl⁻
+        [x, y] = bhGitter(i, j);
+        typ = 'Cl-';
+      } else if (s.cl === 'cl2') {
+        const [mx, my, v] = CL2[k >> 1], t = (k % 2 ? 1 : -1) * 9.95;
+        x = mx + Math.cos(v) * t; y = my + Math.sin(v) * t;
+      } else [x, y] = CL_GAS[k];
+      clPos.push([x, y]);
+      p.push({ id: 'cl' + k, typ, x, y, r: BH_R[typ], op: 1 });
+    }
+    // Elektronerna: inne i natrium före joniseringen, fria efter, inne i klor efter upptaget.
+    for (let k = 0; k < 8; k++) {
+      let x, y, op = 0;
+      if (s.salt || s.cl === '-') [x, y] = clPos[k];
+      else if (s.na === '+') { [x, y] = E_MOLN[k]; op = 1; }
+      else [x, y] = naPos[k];
+      p.push({ id: 'e' + k, typ: 'e', x, y, r: BH_R.e, op });
+    }
+    return { partiklar: p, metall: s.na === 's' && !s.salt };
+  }
+  const BH_TEXT = {
+    start: 'En bit natriummetall och klorgas (Cl₂-molekyler), lika många natrium- som kloratomer.',
+    sub: 'Natriumatomerna lämnar metallen och blir fria atomer i gasform. Metallbindningen bryts, och det kostar energi.',
+    dis: 'Klormolekylerna delas i kloratomer. Bindningen i Cl₂ bryts, och det kostar energi.',
+    ion: 'Varje natriumatom lämnar ifrån sig sin yttersta elektron och blir en mindre Na⁺-jon. Det kostar mycket energi.',
+    ea: 'Kloratomerna tar upp elektronerna och blir större Cl⁻-joner. Det frigör energi, men mindre än joniseringen kostade.',
+    lat: 'Jonerna packas i ett gitter där varje jon omges av joner med motsatt laddning. Attraktionen frigör mycket energi. Bilden är platt: i den riktiga kristallen har varje jon sex grannar.',
+  };
+
+  // --- Modul 1: attraktion och repulsion ------------------------------
+  // Kovalent: Morsepotentialen delas exakt i en repulsiv och en attraktiv del,
+  //   V = D·e^(−2a(r−r0))  −  2D·e^(−a(r−r0)),
+  // med nollnivån långt isär. Den attraktiva delen når längre (avtar som e^(−ar)),
+  // den repulsiva är kortare men brantare (e^(−2ar)). Krafterna är minus
+  // derivatan av varje del; positiv kraft = trycker isär. Vid r0 är de lika stora.
+  // Enheter: pm och kJ/mol; kraft i kJ/(mol·pm). 1 kJ/(mol·pm) = 1,66 nN per molekyl.
+  const NN = 1.6605;
+  function kovDelar(id, pm) {
+    const m = AMNEN[id], a = m.a / 100;                 // pm⁻¹
+    const e = Math.exp(-a * (pm - m.r0));
+    return { vRep: m.D * e * e, vAtt: -2 * m.D * e, fRep: 2 * a * m.D * e * e, fAtt: -2 * a * m.D * e };
+  }
+  // Attraktionens belopp vid jämvikt: referens för pilarnas längd.
+  function kovRef(id) { return 2 * (AMNEN[id].a / 100) * AMNEN[id].D; }
+
+  // Jongitter: ett tvådimensionellt snitt genom NaCl, GIT_KOL × GIT_RAD joner.
+  // Mellan alla par verkar Coulombkraften (k·q₁q₂/r²) och en kortväga repulsion
+  // (Born–Mayer, B·e^(−r/ρ), ρ = 31,7 pm) som bara märks när elektronmolnen
+  // trycks in i varandra. B väljs så att snittet är i jämvikt när det skalas
+  // likformigt till jonavståndet d0 = 282 pm (uppmätt Na–Cl-avstånd).
+  // Övre lagret (GIT_BLOCK rader) kan förskjutas i sidled.
+  const GIT_KOL = 7, GIT_RAD = 5, GIT_BLOCK = 2, GIT_D0 = 282, GIT_RHO = 31.7;
+  const KQQ = 138935;                                  // e²/(4πε₀)·N_A i kJ·pm/mol
+  const JON_R = { Na: 102, Cl: 181 };                  // jonradier, pm
+  function gitterPlatser() {
+    const p = [];
+    for (let j = 0; j < GIT_RAD; j++) for (let i = 0; i < GIT_KOL; i++) {
+      const q = (i + j) % 2 === 0 ? 1 : -1;
+      p.push({ i, j, q, typ: q > 0 ? 'Na' : 'Cl', sx: i - (GIT_KOL - 1) / 2, sy: j - (GIT_RAD - 1) / 2,
+        block: j < GIT_BLOCK, kant: i === 0 || i === GIT_KOL - 1 || j === 0 || j === GIT_RAD - 1 });
+    }
+    return p;
+  }
+  // E(d) = KQQ·Σ q₁q₂/(d·s) + B·Σ e^(−d·s/ρ) över alla par (s = avstånd i enheter av d).
+  // dE/dd = 0 vid d0 ger B.
+  const GIT_B = (() => {
+    const p = gitterPlatser();
+    let c = 0, s = 0;
+    for (let a = 0; a < p.length; a++) for (let b = a + 1; b < p.length; b++) {
+      const sd = Math.hypot(p[a].sx - p[b].sx, p[a].sy - p[b].sy);
+      c += p[a].q * p[b].q / sd;
+      s += (sd / GIT_RHO) * Math.exp(-GIT_D0 * sd / GIT_RHO);
+    }
+    return -KQQ * c / (GIT_D0 * GIT_D0 * s);
+  })();
+  // Kraften på a från b. coul > 0 betyder att de stöter bort varandra.
+  function jonParKraft(a, b) {
+    const dx = a.x - b.x, dy = a.y - b.y, r = Math.hypot(dx, dy) || 1e-9;
+    const coul = KQQ * a.q * b.q / (r * r);
+    const born = GIT_B / GIT_RHO * Math.exp(-r / GIT_RHO);
+    const f = coul + born;
+    return { fx: f * dx / r, fy: f * dy / r, coul, born, r };
+  }
+  // Nettokraften på jon k från alla andra.
+  function jonKraft(joner, k) {
+    let fx = 0, fy = 0;
+    for (let j = 0; j < joner.length; j++) {
+      if (j === k) continue;
+      const f = jonParKraft(joner[k], joner[j]);
+      fx += f.fx; fy += f.fy;
+    }
+    return { fx, fy, belopp: Math.hypot(fx, fy) };
+  }
+  // Nettokraften på det övre lagret från resten av kristallen.
+  function blockKraft(joner) {
+    let fx = 0, fy = 0;
+    for (const a of joner) if (a.block) for (const b of joner) if (!b.block) {
+      const f = jonParKraft(a, b);
+      fx += f.fx; fy += f.fy;
+    }
+    return { fx, fy, belopp: Math.hypot(fx, fy) };
+  }
+  // Snittet är ändligt, så jonerna vid kanterna skulle få små restkrafter.
+  // Lägena avspänns därför en gång vid d0 (gradientsteg) så att varje jon
+  // ligger där krafterna tar ut varandra. Förskjutningarna skalas med d.
+  const GIT_AVSP = (() => {
+    const p = gitterPlatser().map(q => ({ ...q, x: q.sx * GIT_D0, y: q.sy * GIT_D0 }));
+    for (let it = 0; it < 600; it++) {
+      const f = p.map((_, k) => jonKraft(p, k));
+      let max = 0;
+      p.forEach((q, k) => { q.x += 2 * f[k].fx; q.y += 2 * f[k].fy; max = Math.max(max, f[k].belopp); });
+      if (max < 1e-5) break;
+    }
+    return p.map(q => ({ dx: q.x - q.sx * GIT_D0, dy: q.y - q.sy * GIT_D0 }));
+  })();
+  // Jonernas lägen (pm) för ett jonavstånd d, en förskjutning av övre lagret
+  // (x, y) och en enskild jon k som flyttats (dx, dy).
+  function jonLagen(d, block = { x: 0, y: 0 }, flyttad = null) {
+    const sk = d / GIT_D0;
+    return gitterPlatser().map((p, k) => {
+      let x = p.sx * d + GIT_AVSP[k].dx * sk, y = p.sy * d + GIT_AVSP[k].dy * sk;
+      if (p.block) { x += block.x; y += block.y; }
+      if (flyttad && flyttad.k === k) { x += flyttad.dx; y += flyttad.dy; }
+      return { ...p, x, y };
+    });
+  }
+  // En flyttad jon som släppts glider tillbaka (överdämpad rörelse med
+  // begränsad fart, så att den syns). Returnerar kraften på den.
+  const JON_MOB = 120, JON_VMAX = 700;                 // pm/s per kJ/(mol·pm); pm/s
+  function jonSteg(d, block, flyttad, dt) {
+    const joner = jonLagen(d, block, flyttad);
+    const f = jonKraft(joner, flyttad.k);
+    let vx = f.fx * JON_MOB, vy = f.fy * JON_MOB;
+    const v = Math.hypot(vx, vy);
+    if (v > JON_VMAX) { vx *= JON_VMAX / v; vy *= JON_VMAX / v; }
+    flyttad.dx += vx * dt; flyttad.dy += vy * dt;
+    return f;
+  }
+  // Det släppta lagret rör sig som en stel kropp med tröghet och svag dämpning:
+  // stöts det bort fortsätter det bort, dras det tillbaka lägger det sig till rätta.
+  const BLOCK_M = 0.004, BLOCK_DAMP = 1.0;
+  function blockSteg(d, block, dt) {
+    const f = blockKraft(jonLagen(d, block));
+    block.vx += f.fx / BLOCK_M * dt; block.vy += f.fy / BLOCK_M * dt;
+    const damp = Math.exp(-BLOCK_DAMP * dt);
+    block.vx *= damp; block.vy *= damp;
+    block.x += block.vx * dt; block.y += block.vy * dt;
+    return f;
+  }
+  // Energin i hela snittet (kJ/mol per snitt), för kontroll av jämvikten.
+  function gitterEnergi2D(joner) {
+    let e = 0;
+    for (let a = 0; a < joner.length; a++) for (let b = a + 1; b < joner.length; b++) {
+      const r = Math.hypot(joner[a].x - joner[b].x, joner[a].y - joner[b].y);
+      e += KQQ * joner[a].q * joner[b].q / r + GIT_B * Math.exp(-r / GIT_RHO);
+    }
+    return e;
+  }
+  // Den verkliga, tredimensionella kristallen: energi per formelenhet NaCl
+  // (Born–Mayer med Madelungs konstant 1,7476 och samma ρ). Minimum vid d0.
+  const GIT_M = 1.7476;
+  function gitterEnergi(d) {
+    const att = -GIT_M * KQQ / d;
+    const rep = GIT_M * KQQ * GIT_RHO / (GIT_D0 * GIT_D0) * Math.exp((GIT_D0 - d) / GIT_RHO);
+    return { att, rep, tot: att + rep };
+  }
+  function gitterKraft(d) {
+    const att = -GIT_M * KQQ / (d * d);
+    const rep = GIT_M * KQQ / (GIT_D0 * GIT_D0) * Math.exp((GIT_D0 - d) / GIT_RHO);
+    return { att, rep, tot: att + rep };
+  }
+
+  // --- Modul 3: elektronegativitet --------------------------------------
+  // Paulings uppskattning av jonkaraktär.
+  function jonkaraktar(dEN) { return 1 - Math.exp(-(dEN * dEN) / 4); }
+  // Andel av elektronparets täthet hos den mer elektronegativa atomen B:
+  // ψ = cA·φA + cB·φB med cA² = (1−f)/2, cB² = (1+f)/2.
+  function andelB(dEN) { return (1 + jonkaraktar(dEN)) / 2; }
+
+  // --- Modul 5: metallbindning ------------------------------------------
+  // Tre metaller ur period 3 med 1, 2 och 3 valenselektroner per atom.
+  // d0 = avståndet mellan närmaste grannar i metallen, ≈ 2 × metallradien (pm).
+  // rJon = jonradie (Shannon, koordinationstal 6, pm): storleken på kärnan med de inre
+  // elektronerna, som klotet ritas med. forang = ΔfH°(g) vid
+  // 25 °C, alltså energin för M(s) → M(g) (CODATA: 107,5, 147,1, 330,0 kJ/mol).
+  const METALLER = {
+    Na: { id: 'Na', namn: 'natrium', val: 1, d0: 372, rJon: 102, forang: 107 },
+    Mg: { id: 'Mg', namn: 'magnesium', val: 2, d0: 320, rJon: 72, forang: 147 },
+    Al: { id: 'Al', namn: 'aluminium', val: 3, d0: 286, rJon: 54, forang: 330 },
+  };
+  // Metallbiten: MET_KOL_A × MET_RAD_A atomer i tätpackade rader (varannan rad
+  // förskjuten ett halvt steg), avstånd d mellan grannar, mitten i origo.
+  const MET_KOL_A = 7, MET_RAD_A = 4;
+  function metallBit(d) {
+    const p = [], h = d * Math.sqrt(3) / 2;
+    for (let j = 0; j < MET_RAD_A; j++) for (let i = 0; i < MET_KOL_A; i++)
+      p.push({ i, j, x: (i - (MET_KOL_A - 1) / 2 + 0.5 * (j % 2) - 0.25) * d, y: (j - (MET_RAD_A - 1) / 2) * h });
+    return p;
+  }
+  // Elektronhavets ram: atomerna plus en halv grannavstånd runt om (pm).
+  function havsRam(d) {
+    const p = metallBit(d), k = 0.55 * d;
+    return { x0: Math.min(...p.map(a => a.x)) - k, x1: Math.max(...p.map(a => a.x)) + k,
+             y0: Math.min(...p.map(a => a.y)) - k, y1: Math.max(...p.map(a => a.y)) + k };
+  }
+
+  // Elektronhavet: valenselektronerna är delokaliserade, delade av alla atomerna, och rör sig fritt
+  // i hela metallen. Varje elektron rör sig snabbt (E_FART) åt ett slumpvist håll
+  // och byter riktning vid slumpvisa tillfällen, i snitt E_STOT gånger per sekund
+  // (som när den studsar mot atomerna). Mot metallens kanter studsar den.
+  // Med batteriet inkopplat får alla elektroner en drift mot pluspolen (åt höger),
+  // och högerkanten öppnas mot tråden. En elektron som lämnar metallen där går ut i
+  // tråden, och samtidigt kommer en annan elektron in från tråden vid vänsterkanten,
+  // på samma höjd (i modellen samma objekt, flyttat dit). Ingen elektron går runt
+  // kretsen: vid pluspolen tas den upp av ett ämne i batteriet. Vänsterkanten
+  // studsar som utan batteri; att en elektron någon gång slinker ut den vägen, mot
+  // driften, är utelämnat. I verkligheten är driften mycket långsammare än
+  // elektronernas egen rörelse; i bilden är den förstorad.
+  const E_FART = 3000, E_STOT = 4, E_DRIFT = 900;      // pm/s, 1/s, pm/s
+  function slumpRiktning(e) {
+    const u = 2 * Math.PI * slump();
+    e.vx = E_FART * Math.cos(u); e.vy = E_FART * Math.sin(u);
+  }
+  function nyaElektroner(ram, antal) {
+    const el = [];
+    for (let k = 0; k < antal; k++) {
+      const e = { x: ram.x0 + slump() * (ram.x1 - ram.x0), y: ram.y0 + slump() * (ram.y1 - ram.y0), vx: 0, vy: 0 };
+      slumpRiktning(e);
+      el.push(e);
+    }
+    return el;
+  }
+  // Ett tidssteg. o = { ram, batteri, oppen } där oppen = sidokanterna leder vidare
+  // (ett snitt som fortsätter åt sidorna) och batteri = högerkanten leder ut i
+  // tråden. Returnerar antalet elektroner som lämnat metallen åt höger minus åt vänster.
+  function elektronSteg(el, dt, o) {
+    const r = o.ram, B = r.x1 - r.x0, oppen = o.oppen;
+    let genom = 0;
+    for (const e of el) {
+      if (slump() < E_STOT * dt) slumpRiktning(e);
+      e.x += (e.vx + (o.batteri ? E_DRIFT : 0)) * dt;
+      e.y += e.vy * dt;
+      if (e.y < r.y0) { e.y = 2 * r.y0 - e.y; e.vy = Math.abs(e.vy); }
+      if (e.y > r.y1) { e.y = 2 * r.y1 - e.y; e.vy = -Math.abs(e.vy); }
+      if (oppen) {
+        if (e.x > r.x1) { e.x -= B; genom++; }
+        if (e.x < r.x0) { e.x += B; genom--; }
+      } else {
+        if (e.x < r.x0) { e.x = 2 * r.x0 - e.x; e.vx = Math.abs(e.vx); }
+        if (e.x > r.x1 && o.batteri) { e.x -= B; genom++; }
+        else if (e.x > r.x1) { e.x = 2 * r.x1 - e.x; e.vx = -Math.abs(e.vx); }
+      }
+    }
+    return genom;
+  }
+
+  // Böj metallen: ett snitt ur en större bit, periodiskt i sidled (MET_KOL
+  // kolumner), MET_RAD tätpackade rader; de övre MET_BLOCK raderna är lagret.
+  // Allt i enheter av d0. Mellan atomerna verkar en effektiv parpotential där
+  // elektronhavets lim ingår (Morse, som Girifalco & Weizer 1959 använde för
+  // metaller): V = e^(−2a(r−re)) − 2e^(−a(r−re)), räckvidd MET_CUT. re väljs så
+  // att lagret ligger i jämvikt i höjdled i ursprungsläget. Parametrarna är
+  // valda för bilden, inte anpassade till en viss metall.
+  const MET_KOL = 12, MET_RAD = 5, MET_BLOCK = 2, MET_A = 3, MET_CUT = 2.3;
+  function metallPlatser() {
+    const p = [];
+    for (let j = 0; j < MET_RAD; j++) for (let i = 0; i < MET_KOL; i++)
+      p.push({ i, j, block: j < MET_BLOCK,
+        x: i - (MET_KOL - 1) / 2 + 0.5 * (j % 2) - 0.25, y: (j - (MET_RAD - 1) / 2) * Math.sqrt(3) / 2 });
+    return p;
+  }
+  const MET_PLATSER = metallPlatser();
+  // Kraft och energi på lagret (förskjutet bx, by) från resten. fy > 0 drar mot resten.
+  function lagerKraftRe(re, bx, by) {
+    let fx = 0, fy = 0, e = 0;
+    for (const a of MET_PLATSER) if (a.block) for (const b of MET_PLATSER) if (!b.block) {
+      let dx = a.x + bx - b.x;
+      dx -= MET_KOL * Math.round(dx / MET_KOL);
+      const dy = a.y + by - b.y, r = Math.hypot(dx, dy);
+      if (r > MET_CUT) continue;
+      const ex = Math.exp(-MET_A * (r - re));
+      const f = 2 * MET_A * (ex * ex - ex);              // positiv = stöter bort
+      fx += f * dx / r; fy += f * dy / r; e += ex * ex - 2 * ex;
+    }
+    return { fx, fy, e, belopp: Math.hypot(fx, fy) };
+  }
+  const MET_RE = (() => {
+    let lo = 0.8, hi = 1.4;
+    for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; if (lagerKraftRe(m, 0, 0).fy > 0) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  })();
+  function lagerKraft(block) { return lagerKraftRe(MET_RE, block.x, block.y); }
+  // Höjdläget där kraften i höjdled är noll för förskjutningen x: när eleven
+  // skjuter lagret hålls det bara i sidled, och det lyfts lite när atomerna
+  // glider över atomerna i raden under.
+  function lagerHojd(x) {
+    let lo = -0.5, hi = 0.3;                            // lo: dras mot resten, hi: trycks bort
+    for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (lagerKraftRe(MET_RE, x, m).fy > 0) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  }
+  // Atomernas lägen (pm) med lagret förskjutet, lindade in i snittets bredd.
+  function metallLagen(d0, block = { x: 0, y: 0 }) {
+    const L = MET_KOL;
+    return MET_PLATSER.map(p => {
+      let x = p.x + (p.block ? block.x : 0);
+      x -= L * Math.round(x / L);
+      return { ...p, x: x * d0, y: (p.y + (p.block ? block.y : 0)) * d0 };
+    });
+  }
+  // Det släppta lagret rör sig som en stel kropp med tröghet och dämpning.
+  const LAGER_M = 4, LAGER_DAMP = 6;
+  function lagerSteg(block, dt) {
+    const f = lagerKraft(block);
+    block.vx += f.fx / LAGER_M * dt; block.vy += f.fy / LAGER_M * dt;
+    const damp = Math.exp(-LAGER_DAMP * dt);
+    block.vx *= damp; block.vy *= damp;
+    block.x += block.vx * dt; block.y += block.vy * dt;
+    return f;
+  }
+
+  // De ämnesberoende fälten (KJ, PM, R_START …) fylls i av valjAmne.
+  const api = { AMNEN, D, R0, MU, R_MIN_MAL, K_HAND, KROCK_Q, KE_MAX, KE_MIN,
+    START_PM, MAX_PM, sattFro, slump, valjAmne, tidsskala, vKj,
+    V, kraft, nyttPar, systemEnergi, steg, startfart, krock,
+    BH_STEG, BH_START, bhHinder, bhUtfor, bhDH, bhAmnen, bhScen, BH_R, BH_TEXT,
+    jonkaraktar, andelB,
+    NN, kovDelar, kovRef, GIT_KOL, GIT_RAD, GIT_BLOCK, GIT_D0, GIT_RHO, GIT_B, GIT_M, KQQ, JON_R,
+    gitterPlatser, GIT_AVSP, jonLagen, jonParKraft, jonKraft, blockKraft, jonSteg, blockSteg, gitterEnergi2D, gitterEnergi, gitterKraft,
+    METALLER, E_FART, E_STOT, E_DRIFT, MET_KOL_A, MET_RAD_A, metallBit, havsRam, nyaElektroner, elektronSteg,
+    MET_KOL, MET_RAD, MET_BLOCK, MET_RE, metallLagen, lagerKraft, lagerKraftRe, lagerHojd, lagerSteg };
+  valjAmne('H2');
+  return api;
+})();
+
+// =====================================================================
+// GRÄNSSNITT
+// =====================================================================
+const $ = id => document.getElementById(id);
+const fmt = (x, d = 0) => {
+  const s = Math.abs(x).toFixed(d).replace('.', ',');
+  return (x < -0.5 * Math.pow(10, -d) ? '−' : '') + s;
+};
+const fmtTecken = x => (Math.round(x) > 0 ? '+' : '') + fmt(x);
+
+// Gör en canvas skarp på högupplösta skärmar; returnerar {ctx, w, h}.
+function forberedDuk(c) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+  }
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+let aktivVy = 'start';
+function visaVy(namn) {
+  aktivVy = namn;
+  document.querySelectorAll('.vy').forEach(v => v.classList.toggle('aktiv', v.id === 'vy-' + namn));
+  document.querySelectorAll('.flik').forEach(f => f.classList.toggle('aktiv', f.dataset.vy === namn));
+  if (namn === 'm4') m4Rita();
+  if (namn === 'm3') m3Rita();
+}
+
+// =====================================================================
+// MODUL 1
+// =====================================================================
+const M1 = {
+  del: 'kov',            // 'kov' | 'jon'
+  visa: 'kraft',         // 'kraft' | 'energi' (grafen)
+  kov: { amne: 'H2', pm: 120, rort: false, haller: false, grepp: 0, sida: 1, zon: null, klara: new Set() },
+  jon: {
+    d: 282, vald: null, flyttad: null, haller: false, slapper: false, grepp: null,
+    block: { x: 0, y: 0, vx: 0, vy: 0 }, forskjut: 0, lager: 'stilla',   // 'stilla' | 'flyger' | 'sprack' | 'kvar'
+    flygTid: 0, gissning: null, dLag: false, dHog: false, zon: null, klara: new Set(),
+  },
+  forraTid: 0,
+};
+// Temafärger hämtas när de används, så att de följer ett byte av tema.
+const M1_FARG = { get att() { return Tema.farg('att'); }, get rep() { return Tema.farg('danger'); }, get netto() { return Tema.farg('stark'); }, Na: '#9d86d6', Cl: '#4cc36a', get e() { return Tema.farg('elektron'); } };
+
+function m1Meddela(text, typ = '') {
+  const m = $('m1-meddelande');
+  m.textContent = text;
+  m.className = 'meddelande' + (typ ? ' ' + typ : '');
+}
+
+function m1Klar(del, id) {
+  const K = M1[del];
+  if (K.klara.has(id)) return false;
+  K.klara.add(id);
+  const li = document.querySelector(`#m1-${del}-uppdrag li[data-id="${id}"]`);
+  if (li) li.classList.add('klar');
+  return true;
+}
+
+// Pil med mörk kontur så att den syns mot både atomer och bakgrund.
+function m1Pil(ctx, x1, y1, x2, y2, farg, bredd = 3) {
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy);
+  if (L < 2) return;
+  const ux = dx / L, uy = dy / L, hv = Math.min(10, L);
+  for (const [f, b] of [[Tema.farg('kontur'), bredd + 3], [farg, bredd]]) {
+    ctx.strokeStyle = f; ctx.fillStyle = f; ctx.lineWidth = b; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - ux * hv * 0.7, y2 - uy * hv * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - ux * hv - uy * hv * 0.55, y2 - uy * hv + ux * hv * 0.55);
+    ctx.lineTo(x2 - ux * hv + uy * hv * 0.55, y2 - uy * hv - ux * hv * 0.55);
+    ctx.closePath(); ctx.fill();
+    if (b === bredd + 3) { ctx.lineWidth = 3; ctx.stroke(); }
+  }
+}
+// Litet märke för "noll" när en nettokraft är (nästan) noll.
+function m1Noll(ctx, x, y) {
+  ctx.strokeStyle = Tema.farg('kontur'); ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(x, y, 6, 0, 6.29); ctx.stroke();
+  ctx.strokeStyle = M1_FARG.netto; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 6, 0, 6.29); ctx.stroke();
+}
+// Avrundar uppåt till 1, 2 eller 5 gånger en tiopotens.
+function m1Rund(v) {
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const k of [1, 2, 5, 10]) if (k * p >= v) return k * p;
+  return 10 * p;
+}
+
+function m1SattDel(del) {
+  M1.del = del;
+  document.querySelectorAll('#m1-delar button').forEach(b => b.classList.toggle('vald', b.dataset.del === del));
+  document.querySelectorAll('.m1-del').forEach(e => e.classList.toggle('aktiv', e.classList.contains(del)));
+  if (del === 'jon') m1JonVisaFraga();
+  M1[del].zon = null;
+  m1Meddela(del === 'kov' ? 'Dra i en atom och se hur pilarna ändras.' : 'Klicka på en jon för att se krafterna på den.');
+}
+
+function m1SattVisa(visa) {
+  M1.visa = visa;
+  document.querySelectorAll('#m1-visa button').forEach(b => b.classList.toggle('vald', b.dataset.visa === visa));
+}
+
+// ---------------------------------------------------------------------
+// Kovalent: två atomer
+// ---------------------------------------------------------------------
+const M1_PM_MIN = 30, M1_PM_MAX = 400;
+function m1KovSkala(w) { return 0.45 * w / M1_PM_MAX; }     // px per pm
+
+function m1KovSattPm(pm) {
+  M1.kov.pm = Math.min(Math.max(Math.round(pm), M1_PM_MIN), M1_PM_MAX);
+  M1.kov.rort = true;
+}
+
+function m1KovValjAmne(id) {
+  M1.kov.amne = id;
+  M1.kov.rort = false;          // uppdragen räknas först när eleven själv flyttat atomerna
+  document.querySelectorAll('#m1-amnen button').forEach(b => b.classList.toggle('vald', b.dataset.amne === id));
+  M1.kov.zon = null;
+  const m = Fysik.AMNEN[id];
+  m1Meddela(`${m.namn}: två ${m.sym}-atomer med en ${m.bindning}.`);
+}
+
+function m1KovNed(e) {
+  const c = $('m1-kov-bild');
+  const rect = c.getBoundingClientRect();
+  const x = e.clientX - rect.left, w = rect.width, s = m1KovSkala(w);
+  const m = Fysik.AMNEN[M1.kov.amne], rad = RITFAKTOR * m.vdw * s;
+  const cx = w / 2, half = M1.kov.pm * s / 2;
+  const sida = x < cx ? -1 : 1;
+  if (Math.abs(x - (cx + sida * half)) > rad + 10) return;
+  e.preventDefault();
+  M1.kov.haller = true;
+  M1.kov.sida = sida;
+  M1.kov.grepp = x - (cx + sida * half);
+  c.classList.add('drar');
+  c.setPointerCapture(e.pointerId);
+}
+function m1KovFlytt(e) {
+  if (!M1.kov.haller) return;
+  const c = $('m1-kov-bild');
+  const rect = c.getBoundingClientRect();
+  const x = e.clientX - rect.left, w = rect.width, s = m1KovSkala(w);
+  // Båda atomerna rör sig symmetriskt kring mitten.
+  const half = M1.kov.sida * (x - M1.kov.grepp - w / 2);
+  m1KovSattPm(2 * half / s);
+}
+function m1KovUpp() {
+  if (!M1.kov.haller) return;
+  M1.kov.haller = false;
+  $('m1-kov-bild').classList.remove('drar');
+}
+function m1KovTangent(e) {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  const steg = e.shiftKey ? 10 : 2;
+  m1KovSattPm(M1.kov.pm + (e.key === 'ArrowRight' ? steg : -steg));
+}
+
+// Meddelanden och uppdrag efter var atomerna står.
+function m1KovUtfall() {
+  const K = M1.kov, m = Fysik.AMNEN[K.amne];
+  const k = Fysik.kovDelar(K.amne, K.pm), ref = Fysik.kovRef(K.amne);
+  const netto = k.fRep + k.fAtt, x = K.pm / m.r0;
+  const zon = x > 2.5 ? 'langt' : x > 1.05 ? 'dras' : x >= 0.95 ? 'jamvikt' : 'tryck';
+  let text = null, typ = '';
+  if (zon !== K.zon) {
+    K.zon = zon;
+    text = {
+      langt: 'Långt isär är båda krafterna svaga. Attraktionen räcker längre än repulsionen, så nettokraften drar ihop atomerna.',
+      dras: 'Attraktionen är större än repulsionen: atomerna dras mot varandra.',
+      jamvikt: `Krafterna tar ut varandra. Här stannar atomerna: bindningslängden är ${m.r0} pm.`,
+      tryck: 'Repulsionen växer snabbare än attraktionen när kärnorna och elektronmolnen trycks ihop: atomerna trycks isär.',
+    }[zon];
+  }
+  if (!K.rort) { if (text) m1Meddela(text, typ); return; }
+  if (Math.abs(netto) < 0.03 * ref && x > 0.8 && x < 1.3) {
+    if (m1Klar('kov', 'jamvikt')) { text = `Jämvikt: attraktion och repulsion är lika stora vid ${m.r0} pm. Det är bindningslängden.`; typ = 'bra'; }
+    if (K.amne === 'N2' && K.klara.has('jamvikt') && m1Klar('kov', 'n2')) {
+      text = `N₂ i jämvikt: krafterna är ${fmt(Fysik.kovRef('N2') / Fysik.kovRef('H2'), 1)} gånger större än i H₂, och bindningen är mer än dubbelt så stark (945 mot 436 kJ/mol).`; typ = 'bra';
+    }
+  }
+  if (x < 0.62 && m1Klar('kov', 'tryck')) { text = 'Hårt hoptryckt: repulsionen är nu mycket större än attraktionen. Den växer dubbelt så brant.'; typ = 'bra'; }
+  if (x > 1.95 && m1Klar('kov', 'dra')) { text = 'Dubbla avståndet: repulsionen är nästan borta, och attraktionen är svag men drar fortfarande ihop.'; typ = 'bra'; }
+  if (text) m1Meddela(text, typ);
+}
+
+function m1RitaKov() {
+  const c = $('m1-kov-bild');
+  if (!c.clientWidth) return;
+  const { ctx, w, h } = forberedDuk(c);
+  ctx.clearRect(0, 0, w, h);
+  const K = M1.kov, m = Fysik.AMNEN[K.amne], s = m1KovSkala(w);
+  const cy = h / 2 + 8, cx = w / 2;
+  const xA = cx - K.pm * s / 2, xB = cx + K.pm * s / 2;
+  const rad = RITFAKTOR * m.vdw * s;
+  const k = Fysik.kovDelar(K.amne, K.pm), ref = Fysik.kovRef(K.amne);
+  const L = f => Math.min(Math.abs(f) / ref, 2.2) * 70;
+
+  // Atomerna (elektronmolnen)
+  for (const x of [xA, xB]) {
+    const g = ctx.createRadialGradient(x - rad * 0.3, cy - rad * 0.3, rad * 0.1, x, cy, rad);
+    g.addColorStop(0, Tema.rgba('moln-inre', 0.6));
+    g.addColorStop(1, Tema.rgba('moln-yttre', 0.35));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, cy, rad, 0, 6.29); ctx.fill();
+  }
+  // Det delade elektronparet (eller paren) mellan kärnorna, tätare ju närmare
+  // atomerna står. Antalet par följer bindningsordningen.
+  const andel = Math.min(Math.abs(k.vAtt) / (2 * m.D), 1);
+  if (andel > 0.04) {
+    const par = { enkelbindning: 1, dubbelbindning: 2, trippelbindning: 3 }[m.bindning];
+    const bw = Math.max(K.pm * s * 0.55, 18), bh = rad * 0.55;
+    ctx.fillStyle = Tema.rgba('elektron', 0.1 + 0.3 * andel);
+    ctx.beginPath(); ctx.ellipse(cx, cy, bw / 2, bh / 2 + 4 * par, 0, 0, 6.29); ctx.fill();
+    ctx.fillStyle = Tema.rgba('elektron', 0.3 + 0.7 * andel);
+    for (let p = 0; p < par; p++) {
+      const yy = cy + (p - (par - 1) / 2) * 11;
+      for (const t of [-4, 4]) { ctx.beginPath(); ctx.arc(cx + t, yy, 3, 0, 6.29); ctx.fill(); }
+    }
+    if (K.pm < 1.8 * m.r0) {
+      ctx.fillStyle = Tema.rgba('elektron', 0.3 + 0.7 * andel); ctx.font = '12px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(par === 1 ? 'delat elektronpar' : `${par} delade elektronpar`, cx, cy + rad + 22);
+    }
+  }
+  // Kärnorna
+  for (const x of [xA, xB]) {
+    ctx.fillStyle = Tema.farg('stark'); ctx.beginPath(); ctx.arc(x, cy, 7, 0, 6.29); ctx.fill();
+    ctx.fillStyle = Tema.farg('kontur'); ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('+', x, cy + 1);
+    ctx.textBaseline = 'alphabetic';
+  }
+  ctx.fillStyle = Tema.farg('text'); ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center';
+  ctx.fillText(m.sym, xA, cy - rad - 8); ctx.fillText(m.sym, xB, cy - rad - 8);
+
+  // Pilarna: vänstra atomens ovanför axeln, högra atomens nedanför, så att
+  // de inte ritas över varandra när atomerna står nära.
+  const netto = k.fRep + k.fAtt;
+  for (const [x, ut, sida] of [[xA, -1, -1], [xB, 1, 1]]) {
+    const yk = cy + sida * 32, yn = cy + sida * 12;
+    m1Pil(ctx, x, yk, x + ut * L(k.fRep), yk, M1_FARG.rep);
+    m1Pil(ctx, x, yk, x - ut * L(k.fAtt), yk, M1_FARG.att);
+    if (Math.abs(netto) < 0.02 * ref) m1Noll(ctx, x, yn);
+    else m1Pil(ctx, x, yn, x + ut * Math.sign(netto) * L(netto), yn, M1_FARG.netto, 4);
+  }
+  ctx.fillStyle = Tema.farg('text'); ctx.font = '13px system-ui'; ctx.textAlign = 'right';
+  ctx.fillText(`avstånd ${fmt(K.pm)} pm`, w - 12, 22);
+  if (Math.abs(netto) < 0.02 * ref) { ctx.fillStyle = M1_FARG.netto; ctx.fillText('nettokraft 0: jämvikt', w - 12, 40); }
+}
+
+// ---------------------------------------------------------------------
+// Jonkristallen
+// ---------------------------------------------------------------------
+const M1_D_MAX = 380;
+function m1JonSkala(h) { return (h - 64) / ((Fysik.GIT_RAD - 1) * M1_D_MAX + 2 * Fysik.JON_R.Cl); }   // px per pm
+function m1Joner() { const J = M1.jon; return Fysik.jonLagen(J.d, J.block, J.flyttad); }
+
+function m1JonVisaFraga() {
+  const J = M1.jon;
+  const behover = J.gissning === null;
+  $('m1-fraga').classList.toggle('aktiv', M1.del === 'jon' && behover);
+  $('m1-forskjut').disabled = behover;
+  $('m1-slapp').disabled = behover || J.forskjut === 0 || J.lager !== 'stilla';
+}
+
+function m1JonGissa(g) {
+  M1.jon.gissning = g;
+  m1JonVisaFraga();
+  m1Meddela('Bra. Skjut lagret med reglaget och släpp det sedan.');
+}
+
+function m1JonSattD(d) {
+  const J = M1.jon;
+  J.d = d;
+  if (J.lager === 'stilla') J.block.x = J.forskjut * d;
+  if (d <= 250) J.dLag = true;
+  if (d >= 330) J.dHog = true;
+  if (J.dLag && J.dHog && Math.abs(d - Fysik.GIT_D0) <= 6 && m1Klar('jon', 'botten')) {
+    m1Meddela(`Lägst energi vid ${Fysik.GIT_D0} pm, där attraktion och repulsion tar ut varandra. Det är jonavståndet i verklig koksalt.`, 'bra');
+  }
+  J.zon = null;
+}
+
+function m1JonForskjut(andel) {
+  const J = M1.jon;
+  if (J.lager !== 'stilla') { J.lager = 'stilla'; J.block.y = 0; J.block.vx = J.block.vy = 0; }
+  J.forskjut = andel;
+  J.block.x = andel * J.d;
+  J.block.y = 0;
+  m1JonVisaFraga();
+  const f = Fysik.blockKraft(m1Joner());
+  if (andel === 0) m1Meddela('Lagret ligger på plats: varje jon har motsatt laddade grannar under sig.');
+  else if (f.fy < -0.5 && Math.abs(f.fy) > Math.abs(f.fx)) m1Meddela('Lika laddningar ligger nu mitt emot varandra över skarven. Nettokraften på lagret pekar bort från kristallen. Släpp det och se.', 'obs');
+  else m1Meddela('Nettokraften på lagret pekar tillbaka mot det gamla läget. Släpp det och se.');
+}
+
+function m1JonSlapp() {
+  const J = M1.jon;
+  if (J.lager !== 'stilla' || J.forskjut === 0) return;
+  J.lager = 'flyger';
+  J.flygTid = 0;
+  J.block.vx = J.block.vy = 0;
+  $('m1-slapp').disabled = true;
+  m1Meddela('Lagret är släppt.');
+}
+
+function m1JonNollstall() {
+  const J = M1.jon;
+  J.block = { x: 0, y: 0, vx: 0, vy: 0 };
+  J.forskjut = 0; J.lager = 'stilla'; J.flyttad = null; J.vald = null; J.haller = false; J.slapper = false; J.zon = null;
+  $('m1-forskjut').value = 0;
+  m1JonVisaFraga();
+  m1Meddela('Kristallen är hel igen. Klicka på en jon för att se krafterna på den.');
+}
+
+function m1JonPunkt(e) {
+  const c = $('m1-jon-bild');
+  const rect = c.getBoundingClientRect();
+  const s = m1JonSkala(rect.height);
+  return { x: (e.clientX - rect.left - rect.width / 2) / s, y: (e.clientY - rect.top - rect.height / 2 - 12) / s, s };
+}
+
+function m1JonNed(e) {
+  const J = M1.jon;
+  if (J.lager === 'flyger') return;
+  const p = m1JonPunkt(e);
+  const joner = m1Joner();
+  let k = null, bast = Infinity;
+  joner.forEach((q, i) => {
+    const avst = Math.hypot(q.x - p.x, q.y - p.y);
+    if (avst < Fysik.JON_R[q.typ] + 4 / p.s && avst < bast) { bast = avst; k = i; }
+  });
+  e.preventDefault();
+  if (k === null) { J.vald = null; return; }
+  if (J.flyttad && J.flyttad.k !== k) J.flyttad = null;
+  J.vald = k;
+  J.slapper = false;
+  J.haller = true;
+  J.flyttad = J.flyttad || { k, dx: 0, dy: 0 };
+  J.grepp = { x: p.x - joner[k].x, y: p.y - joner[k].y };
+  $('m1-jon-bild').classList.add('drar');
+  $('m1-jon-bild').setPointerCapture(e.pointerId);
+  m1JonBeskriv();
+}
+function m1JonFlytt(e) {
+  const J = M1.jon;
+  if (!J.haller || !J.flyttad) return;
+  const p = m1JonPunkt(e);
+  const hem = Fysik.jonLagen(J.d, J.block)[J.flyttad.k];
+  let dx = p.x - J.grepp.x - hem.x, dy = p.y - J.grepp.y - hem.y;
+  const r = Math.hypot(dx, dy), max = 0.55 * J.d;
+  if (r > max) { dx *= max / r; dy *= max / r; }
+  J.flyttad.dx = dx; J.flyttad.dy = dy;
+  if (r > 0.1 * J.d && J.zon !== 'ur') { J.zon = 'ur'; m1Meddela('Ur läge: nettokraften pekar tillbaka mot platsen. Släpp jonen.'); }
+}
+function m1JonUpp() {
+  const J = M1.jon;
+  if (!J.haller) return;
+  J.haller = false;
+  $('m1-jon-bild').classList.remove('drar');
+  if (!J.flyttad) return;
+  const r = Math.hypot(J.flyttad.dx, J.flyttad.dy);
+  if (r < 1) { J.flyttad = null; return; }
+  J.slapper = true;
+  J.slapptFran = r;
+}
+
+// Text om den valda jonen, utifrån var den sitter och hur kristallen är skalad.
+function m1JonBeskriv() {
+  const J = M1.jon;
+  if (J.vald === null) return;
+  const p = Fysik.gitterPlatser()[J.vald];
+  const hop = J.d < 265, ut = J.d > 300;
+  let text, typ = '';
+  if (!p.kant) {
+    text = 'Inne i snittet drar fyra motsatt laddade grannar åt var sitt håll, och fyra lika laddade på diagonalen stöter bort. Allt tar ut varandra: nettokraften är noll. I den riktiga kristallen har jonen sex motsatt laddade grannar, eftersom det också finns en ovanför och en under.';
+    if (m1Klar('jon', 'inne')) typ = 'bra';
+  } else if (hop) {
+    text = 'Hoptryckt kristall: elektronmolnen överlappar, repulsionen vinner och jonen vid kanten trycks utåt.';
+    if (m1Klar('jon', 'kant')) typ = 'bra';
+  } else if (ut) {
+    text = 'Utsträckt kristall: attraktionen vinner och jonen vid kanten dras inåt.';
+    if (m1Klar('jon', 'kant')) typ = 'bra';
+  } else {
+    text = 'Vid kanten saknas grannar på utsidan, men krafterna tar ändå ut varandra: jonen ligger stilla.';
+  }
+  J.zon = 'vald';
+  m1Meddela(text, typ);
+}
+
+// Fysiken framåt för en släppt jon och ett släppt lager.
+function m1JonUppdatera(sek) {
+  const J = M1.jon;
+  const n = 10, dt = sek / n;
+  if (J.slapper && J.flyttad) {
+    let f;
+    for (let i = 0; i < n; i++) f = Fysik.jonSteg(J.d, J.block, J.flyttad, dt);
+    if (Math.hypot(J.flyttad.dx, J.flyttad.dy) < 1.5 && f.belopp < 0.05) {
+      J.flyttad = null; J.slapper = false; J.zon = null;
+      const stor = J.slapptFran > 0.25 * J.d;
+      m1Meddela('Jonen gled tillbaka till sin plats. Så länge den har motsatt laddade grannar runt sig hålls den kvar.', stor && m1Klar('jon', 'ur') ? 'bra' : '');
+    }
+  }
+  // Ett släppt lager rör sig tills det lossnat; ett som stannat kvar får
+  // fortsätta lägga sig till rätta.
+  if (J.lager === 'flyger' || J.lager === 'kvar') {
+    for (let i = 0; i < n; i++) Fysik.blockSteg(J.d, J.block, dt);
+    J.flygTid += sek;
+    const fart = Math.hypot(J.block.vx, J.block.vy);
+    if (J.lager === 'kvar') return;
+    if (J.block.y < -1.1 * J.d) {
+      J.lager = 'sprack';
+      let text = 'Kristallen sprack. När lagret förskjutits ett steg ligger Na⁺ mot Na⁺ och Cl⁻ mot Cl⁻, och repulsionen stöter bort hela lagret. Därför är salt sprött: ett slag förskjuter lagren, och kristallen går sönder.';
+      if (J.forskjut >= 0.9) {
+        if (J.gissning === 'haller') text = 'Du gissade att den skulle hålla ihop, men den sprack. ' + text;
+        if (J.gissning === 'spricker') text = 'Rätt gissat! ' + text;
+        m1Klar('jon', 'lager');
+      }
+      m1Meddela(text, 'bra');
+    } else if (J.flygTid > 1.5 && fart < 40 && Math.abs(J.block.y) < 0.3 * J.d) {
+      J.lager = 'kvar';
+      let text = 'Lagret gled tillbaka: varje jon fick åter motsatt laddade grannar, och attraktionen höll kristallen ihop.';
+      if (J.forskjut < 0.9) text += ' Prova att skjuta lagret hela vägen.';
+      else if (J.gissning === 'spricker') text = 'Du gissade att den skulle spricka, men den höll. ' + text;
+      m1Meddela(text, 'obs');
+    }
+  }
+}
+
+function m1RitaJon() {
+  const c = $('m1-jon-bild');
+  if (!c.clientWidth) return;
+  const { ctx, w, h } = forberedDuk(c);
+  ctx.clearRect(0, 0, w, h);
+  const J = M1.jon, s = m1JonSkala(h);
+  const cx = w / 2, cy = h / 2 + 12;
+  const joner = m1Joner();
+  const X = p => cx + p.x * s, Y = p => cy + p.y * s;
+
+  // Skarven mellan lagret och resten
+  if (J.forskjut > 0 || J.lager !== 'stilla') {
+    const ySk = cy + (Fysik.GIT_BLOCK - 1 - (Fysik.GIT_RAD - 1) / 2 + 0.5) * J.d * s;
+    ctx.strokeStyle = Tema.farg('text-dim'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx - 3.6 * J.d * s, ySk); ctx.lineTo(cx + 3.6 * J.d * s, ySk); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // Jonerna
+  joner.forEach((p, k) => {
+    const r = Fysik.JON_R[p.typ] * s, x = X(p), y = Y(p);
+    // När en jon är vald tonas alla joner ned, så att kraftpilarna syns.
+    ctx.fillStyle = M1_FARG[p.typ]; ctx.globalAlpha = J.vald === null ? 0.85 : k === J.vald ? 0.3 : 0.4;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.29); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = k === J.vald ? Tema.farg('stark') : '#0d1520'; ctx.lineWidth = k === J.vald ? 2.5 : 1; ctx.stroke();
+    if (k !== J.vald) {
+      ctx.fillStyle = J.vald === null ? '#0d1520' : Tema.rgba('text', 0.75);
+      ctx.font = `bold ${r > 22 ? 12 : 10}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(p.typ === 'Na' ? 'Na⁺' : 'Cl⁻', x, y + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
+  });
+  // Krafterna på den valda jonen: en pil per granne inom två steg (blå mot
+  // motsatt laddade, röda bort från lika laddade) och en vit nettopil från alla.
+  const ref = Fysik.KQQ / (Fysik.GIT_D0 * Fysik.GIT_D0);     // kraften från en närmaste granne vid d0
+  // Kraften från en granne är attraktionen minus den kortväga repulsionen, ungefär
+  // halva Coulombkraften vid jämvikt. Skalan väljs så att pilen då når ut ur jonen.
+  const L = f => Math.min(Math.abs(f) / ref, 2.5) * 1.7 * Fysik.GIT_D0 * s;
+  if (J.vald !== null) {
+    const a = joner[J.vald], x = X(a), y = Y(a);
+    joner.forEach((b, j) => {
+      if (j === J.vald || Math.abs(b.i - a.i) > 1 || Math.abs(b.j - a.j) > 1) return;
+      const f = Fysik.jonParKraft(a, b), bel = Math.hypot(f.fx, f.fy);
+      if (bel < 1e-6) return;
+      const stot = f.coul + f.born > 0;
+      const ln = L(bel);
+      m1Pil(ctx, x, y, x + f.fx / bel * ln, y + f.fy / bel * ln, stot ? M1_FARG.rep : M1_FARG.att, 2.5);
+    });
+    const n = Fysik.jonKraft(joner, J.vald);
+    if (n.belopp < 0.03 * ref) m1Noll(ctx, x, y);
+    else m1Pil(ctx, x, y, x + n.fx / n.belopp * L(n.belopp), y + n.fy / n.belopp * L(n.belopp), M1_FARG.netto, 4.5);
+  }
+  // Kraften på det övre lagret
+  if (J.forskjut > 0 || J.lager !== 'stilla') {
+    const f = Fysik.blockKraft(joner);
+    const bx = cx + J.block.x * s, by = cy + (J.block.y + (0.5 - (Fysik.GIT_RAD - 1) / 2) * J.d) * s;
+    if (f.belopp > 0.03 * ref) {
+      const ln = Math.min(f.belopp / ref, 3) * 36;
+      m1Pil(ctx, bx, by, bx + f.fx / f.belopp * ln, by + f.fy / f.belopp * ln, M1_FARG.netto, 5);
+      ctx.fillStyle = Tema.farg('text'); ctx.font = '12px system-ui'; ctx.textAlign = 'left';
+      ctx.fillText('kraft på lagret', bx + 12, by - 10);
+    }
+  }
+  ctx.fillStyle = Tema.farg('text'); ctx.font = '13px system-ui'; ctx.textAlign = 'right';
+  ctx.fillText(`jonavstånd ${fmt(J.d)} pm`, w - 12, 22);
+  ctx.fillStyle = Tema.farg('text-dim'); ctx.textAlign = 'left';
+  ctx.fillText('Snitt genom en NaCl-kristall', 12, h - 10);
+}
+
+// ---------------------------------------------------------------------
+// Grafen: attraktion, repulsion och summa mot avstånd
+// ---------------------------------------------------------------------
+function m1Serier() {
+  const kov = M1.del === 'kov', kraft = M1.visa === 'kraft';
+  if (kov) {
+    const id = M1.kov.amne, m = Fysik.AMNEN[id];
+    if (kraft) {
+      const ymax = m1Rund(2.2 * Fysik.kovRef(id) * Fysik.NN);
+      return { xMin: 0, xMax: M1_PM_MAX, yMin: -ymax, yMax: ymax, xNu: M1.kov.pm, enhet: 'nN',
+        etikett: 'Kraft (nN) mot avstånd mellan kärnorna (pm). Positiv kraft trycker isär, negativ drar ihop.',
+        serier: [
+          { namn: 'attraktion', farg: M1_FARG.att, f: pm => Fysik.kovDelar(id, pm).fAtt * Fysik.NN },
+          { namn: 'repulsion', farg: M1_FARG.rep, f: pm => Fysik.kovDelar(id, pm).fRep * Fysik.NN },
+          { namn: 'netto', farg: M1_FARG.netto, f: pm => { const k = Fysik.kovDelar(id, pm); return (k.fAtt + k.fRep) * Fysik.NN; } },
+        ] };
+    }
+    return { xMin: 0, xMax: M1_PM_MAX, yMin: -m1Rund(2.2 * m.D), yMax: m1Rund(1.4 * m.D), xNu: M1.kov.pm, enhet: 'kJ/mol',
+      etikett: 'Lägesenergi (kJ/mol) mot avstånd mellan kärnorna (pm). 0 = atomerna långt isär.',
+      serier: [
+        { namn: 'attraktion', farg: M1_FARG.att, f: pm => Fysik.kovDelar(id, pm).vAtt },
+        { namn: 'repulsion', farg: M1_FARG.rep, f: pm => Fysik.kovDelar(id, pm).vRep },
+        { namn: 'summa', farg: M1_FARG.netto, f: pm => { const k = Fysik.kovDelar(id, pm); return k.vAtt + k.vRep; } },
+      ] };
+  }
+  if (kraft) {
+    const ymax = m1Rund(2.2 * Fysik.gitterKraft(Fysik.GIT_D0).rep * Fysik.NN);
+    return { xMin: 200, xMax: 400, yMin: -ymax, yMax: ymax, xNu: M1.jon.d, enhet: 'nN',
+      etikett: 'Kraft (nN per NaCl) mot jonavstånd (pm) i en tredimensionell kristall. Positiv trycker isär, negativ drar ihop.',
+      serier: [
+        { namn: 'attraktion', farg: M1_FARG.att, f: d => Fysik.gitterKraft(d).att * Fysik.NN },
+        { namn: 'repulsion', farg: M1_FARG.rep, f: d => Fysik.gitterKraft(d).rep * Fysik.NN },
+        { namn: 'netto', farg: M1_FARG.netto, f: d => Fysik.gitterKraft(d).tot * Fysik.NN },
+      ] };
+  }
+  return { xMin: 200, xMax: 400, yMin: -1250, yMax: 500, xNu: M1.jon.d, enhet: 'kJ/mol',
+    etikett: 'Energi (kJ/mol per NaCl) mot jonavstånd (pm) i en tredimensionell kristall. 0 = jonerna långt isär.',
+    serier: [
+      { namn: 'attraktion', farg: M1_FARG.att, f: d => Fysik.gitterEnergi(d).att },
+      { namn: 'repulsion', farg: M1_FARG.rep, f: d => Fysik.gitterEnergi(d).rep },
+      { namn: 'summa', farg: M1_FARG.netto, f: d => Fysik.gitterEnergi(d).tot },
+    ] };
+}
+
+function m1RitaGraf() {
+  const c = $('m1-graf');
+  if (!c.clientWidth) return;
+  const { ctx, w, h } = forberedDuk(c);
+  ctx.clearRect(0, 0, w, h);
+  const G = m1Serier();
+  $('m1-graf-etikett').textContent = G.etikett;
+  const X = v => 56 + (v - G.xMin) / (G.xMax - G.xMin) * (w - 76);
+  const top = 38, bot = h - 26;
+  const Y = v => top + (G.yMax - v) / (G.yMax - G.yMin) * (bot - top);
+  ctx.font = '12px system-ui'; ctx.fillStyle = Tema.farg('text-dim'); ctx.strokeStyle = Tema.farg('border'); ctx.lineWidth = 1;
+  ctx.textAlign = 'right';
+  const ySteg = m1Rund((G.yMax - G.yMin) / 6);
+  for (let v = Math.ceil(G.yMin / ySteg) * ySteg; v <= G.yMax; v += ySteg) {
+    ctx.beginPath(); ctx.moveTo(56, Y(v)); ctx.lineTo(w - 20, Y(v)); ctx.stroke();
+    ctx.fillText(fmtTecken(v), 50, Y(v) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let v = G.xMin; v <= G.xMax; v += 50) ctx.fillText(v, X(v), h - 8);
+  ctx.strokeStyle = Tema.farg('text-dim'); ctx.setLineDash([2, 3]);
+  ctx.beginPath(); ctx.moveTo(56, Y(0)); ctx.lineTo(w - 20, Y(0)); ctx.stroke();
+  ctx.setLineDash([]);
+  // Nuvarande avstånd
+  ctx.strokeStyle = Tema.rgba('text', 0.35);
+  ctx.beginPath(); ctx.moveTo(X(G.xNu), top); ctx.lineTo(X(G.xNu), bot); ctx.stroke();
+  const x0 = Math.max(G.xMin, 20);
+  G.serier.forEach((S, i) => {
+    ctx.strokeStyle = S.farg; ctx.lineWidth = S.namn === 'netto' || S.namn === 'summa' ? 3 : 2;
+    ctx.beginPath();
+    let forst = true;
+    for (let v = x0; v <= G.xMax; v += 1) {
+      const y = S.f(v);
+      if (y > G.yMax || y < G.yMin) { forst = true; continue; }
+      if (forst) { ctx.moveTo(X(v), Y(y)); forst = false; } else ctx.lineTo(X(v), Y(y));
+    }
+    ctx.stroke();
+    const yNu = S.f(G.xNu);
+    if (yNu <= G.yMax && yNu >= G.yMin) {
+      ctx.fillStyle = S.farg; ctx.beginPath(); ctx.arc(X(G.xNu), Y(yNu), 5, 0, 6.29); ctx.fill();
+    }
+    ctx.fillStyle = S.farg; ctx.textAlign = 'left'; ctx.font = 'bold 12px system-ui';
+    ctx.fillText(S.namn, w - 150 + i * 0, top + 2 + i * 15);
+  });
+}
+
+// Sifferrutan under reglagen.
+function m1Siffror() {
+  if (M1.del === 'kov') {
+    const K = M1.kov, k = Fysik.kovDelar(K.amne, K.pm), ref = Fysik.kovRef(K.amne);
+    const netto = k.fRep + k.fAtt;
+    const ord = Math.abs(netto) < 0.02 * ref ? 'jämvikt' : netto < 0 ? 'drar ihop' : 'trycker isär';
+    $('m1-kov-krafter').innerHTML =
+      `<span></span><span class="rubrik">kraft (nN)</span><span class="rubrik">energi (kJ/mol)</span>` +
+      `<span class="att">Attraktion</span><span class="tal att">${fmtTecken(k.fAtt * Fysik.NN)}</span><span class="tal att">${fmtTecken(k.vAtt)}</span>` +
+      `<span class="rep">Repulsion</span><span class="tal rep">${fmtTecken(k.fRep * Fysik.NN)}</span><span class="tal rep">${fmtTecken(k.vRep)}</span>` +
+      `<span>Netto</span><span class="tal">${fmtTecken(netto * Fysik.NN)}</span><span class="tal">${fmtTecken(k.vAtt + k.vRep)}</span>` +
+      `<span class="ord">Nettokraften ${ord}. Kraften gäller en molekyl, i nanonewton. Energin gäller en mol, alltså 6·10²³ molekyler.</span>`;
+    const r = $('m1-kov-r');
+    if (document.activeElement !== r && Number(r.value) !== K.pm) r.value = K.pm;
+    return;
+  }
+  const J = M1.jon, joner = m1Joner();
+  const ref = Fysik.KQQ / (Fysik.GIT_D0 * Fysik.GIT_D0);
+  const rader = [];
+  if (J.vald !== null) {
+    const n = Fysik.jonKraft(joner, J.vald);
+    const p = Fysik.gitterPlatser()[J.vald];
+    rader.push(`<span>Nettokraft på ${p.typ === 'Na' ? 'Na⁺' : 'Cl⁻'}</span><span class="tal">${fmt(n.belopp * Fysik.NN, 1)} nN</span><span>${n.belopp < 0.03 * ref ? 'noll' : ''}</span>`);
+  }
+  if (J.forskjut > 0 || J.lager !== 'stilla') {
+    const f = Fysik.blockKraft(joner);
+    const riktning = f.belopp < 0.03 * ref ? 'noll' : f.fy < 0 && Math.abs(f.fy) >= Math.abs(f.fx) ? 'bort från kristallen' : f.fy > 0 && Math.abs(f.fy) >= Math.abs(f.fx) ? 'mot kristallen' : 'åt sidan';
+    rader.push(`<span>Kraft på lagret</span><span class="tal">${fmt(f.belopp * Fysik.NN, 1)} nN</span><span>${riktning}</span>`);
+  }
+  const e = Fysik.gitterEnergi(J.d);
+  rader.push(`<span>Energi per NaCl</span><span class="tal">${fmtTecken(e.tot)} kJ/mol</span><span></span>`);
+  rader.push(`<span class="ord">Bilden är ett plant snitt med några joner. Energin gäller en mol av den riktiga, tredimensionella kristallen. Modellen ger ${fmtTecken(Fysik.gitterEnergi(Fysik.GIT_D0).tot)} kJ/mol, mätningar ger −786 kJ/mol (Energitrappan). Skillnaden beror på att modellen är förenklad.</span>`);
+  $('m1-jon-krafter').innerHTML = rader.join('');
+  const d = $('m1-jon-d');
+  if (document.activeElement !== d && Number(d.value) !== J.d) d.value = J.d;
+}
+
+function m1Rita(tid) {
+  const sek = Math.min((tid - (M1.forraTid || tid)) / 1000, 0.05);
+  M1.forraTid = tid;
+  if (aktivVy === 'm1') {
+    if (M1.del === 'kov') { m1KovUtfall(); m1RitaKov(); }
+    else { m1JonUppdatera(sek); m1RitaJon(); }
+    m1RitaGraf();
+    m1Siffror();
+  }
+  requestAnimationFrame(m1Rita);
+}
+
+function m1Init() {
+  document.querySelectorAll('#m1-delar button').forEach(b => b.addEventListener('click', () => m1SattDel(b.dataset.del)));
+  document.querySelectorAll('#m1-visa button').forEach(b => b.addEventListener('click', () => m1SattVisa(b.dataset.visa)));
+  document.querySelectorAll('#m1-amnen button').forEach(b => b.addEventListener('click', () => m1KovValjAmne(b.dataset.amne)));
+  const ck = $('m1-kov-bild');
+  ck.addEventListener('pointerdown', m1KovNed);
+  ck.addEventListener('pointermove', m1KovFlytt);
+  ck.addEventListener('pointerup', m1KovUpp);
+  ck.addEventListener('pointercancel', m1KovUpp);
+  ck.addEventListener('keydown', m1KovTangent);
+  $('m1-kov-r').addEventListener('input', e => m1KovSattPm(Number(e.target.value)));
+  const cj = $('m1-jon-bild');
+  cj.addEventListener('pointerdown', m1JonNed);
+  cj.addEventListener('pointermove', m1JonFlytt);
+  cj.addEventListener('pointerup', m1JonUpp);
+  cj.addEventListener('pointercancel', m1JonUpp);
+  $('m1-jon-d').addEventListener('input', e => m1JonSattD(Number(e.target.value)));
+  $('m1-forskjut').addEventListener('input', e => m1JonForskjut(Number(e.target.value) / 100));
+  $('m1-slapp').addEventListener('click', m1JonSlapp);
+  $('m1-jon-om').addEventListener('click', m1JonNollstall);
+  $('m1-gissa-haller').addEventListener('click', () => m1JonGissa('haller'));
+  $('m1-gissa-spricker').addEventListener('click', () => m1JonGissa('spricker'));
+  requestAnimationFrame(m1Rita);
+}
+
+// =====================================================================
+// MODUL 2
+// =====================================================================
+const M2 = {
+  par: Fysik.nyttPar(),
+  lage: 'hand',          // 'hand' | 'fri'
+  omgivning: false,
+  haller: false,         // musknappen nere på atomen
+  mal: Fysik.R_START,    // handens målavstånd
+  drag: 0,               // slangbellans utdrag (r0)
+  iFlykt: false,         // fri rörelse pågår efter knuff
+  besokt: new Array(240).fill(false),
+  gissning: null,        // 'fast' | 'studs'
+  utfallVisat: false,
+  tidBunden: 0,
+  molekyler: [],         // omgivningens N2 (läge i r0-enheter, origo i atom A)
+  utskick: null,         // {mol, tStart, tTraff, fran, till} för nästa krock
+  etiketter: [],         // flytande "+X kJ/mol" vid krockar
+  simTid: 0,             // simulerad tid (reducerade enheter)
+  klara: new Set(),
+  bildade: new Set(),    // ämnen eleven har bildat en molekyl av
+  forraTid: 0,
+};
+let TIDSSKALA = Fysik.tidsskala('H2');     // reducerade tidsenheter per sekund
+const DT = 0.001;
+
+// Atomvyn täcker ca 11 r0 (800 pm) så att omgivningens N2 får plats i rätt skala.
+// Atomvyn ritas i scenenheter om 74 pm (H2:s bindningslängd), lika för alla ämnen,
+// så att storlekar och avstånd kan jämföras när eleven byter molekyl.
+const M2_BREDD = 11.7, SC = 74;
+// Atomerna ritas med 45 % av van der Waals-radien: då överlappar de vid
+// bindningsavståndet för alla tre molekylerna, och N2 i luften ritas i samma skala.
+const RITFAKTOR = 0.45;
+const N_RAD = RITFAKTOR * 155 / SC, N_N = 110 / SC;
+function m2AtomRad() { return RITFAKTOR * Fysik.amne.vdw / SC; }
+function m2Scen(r) { return r * Fysik.PM / SC; }        // reducerat avstånd → scenenheter
+function m2Red(x) { return x * SC / Fysik.PM; }         // scenenheter → reducerat avstånd
+// Skalan begränsas av både bredd och höjd. På höjden ska en N2-molekyl i vila
+// (eller mitt i en krock) få plats ovanför och under atomerna: M2_HOJD scenenheter
+// från mittlinjen.
+const M2_HOJD = 2.7;
+function m2Skala(w) { return Math.min((w - 20) / M2_BREDD, ($('m2-atomer').clientHeight / 2 - 4) / M2_HOJD); }
+// Scenen centreras i sidled. Vänstra atomen står still, så långt till vänster att
+// även den största (N) syns hel.
+function m2Centrum(w) { const s = m2Skala(w); return Math.max(12, (w - M2_BREDD * s) / 2) + (N_RAD + 0.05) * s; }
+// x (scenenheter) strax bortom rutans högerkant, där en uppvärmd molekyl försvinner.
+function m2Utanfor() { const w = $('m2-atomer').clientWidth; return (w - m2Centrum(w)) / m2Skala(w) + 1.8; }
+// Kurvan i fasta enheter (pm, kJ/mol) för alla ämnen, så att de kan jämföras.
+const KURVA_PM = 414, KURVA_MAX = 450, KURVA_MIN = -1000;
+function m2KurvaX(pm, w) { return 50 + (pm / KURVA_PM) * (w - 70); }
+function m2KurvaY(kj, h) { const top = 34, bot = h - 26; return top + (KURVA_MAX - kj) / (KURVA_MAX - KURVA_MIN) * (bot - top); }
+
+function m2Nollstall() {
+  M2.par = Fysik.nyttPar();
+  M2.knuffKj = 0;
+  m2NyaMolekyler();
+  M2.mal = Fysik.R_START;
+  M2.drag = 0;
+  M2.iFlykt = false;
+  M2.utfallVisat = false;
+  M2.tidBunden = 0;
+  M2.haller = false;
+  M2.aktiv = false;
+  M2.forraIdx = null;
+  m2VisaFraga();
+  m2Meddela(M2.lage === 'hand'
+    ? 'Dra atomerna mot varandra och håll koll på staplarna.'
+    : 'Dra den högra atomen åt höger som en slangbella och släpp.');
+}
+
+function m2Meddela(text, typ = '') {
+  const m = $('m2-meddelande');
+  m.textContent = text;
+  m.className = 'meddelande' + (typ ? ' ' + typ : '');
+}
+
+function m2Klar(id) {
+  if (M2.klara.has(id)) return;
+  M2.klara.add(id);
+  const li = document.querySelector(`#m2-uppdrag li[data-id="${id}"]`);
+  if (li) li.classList.add('klar');
+}
+
+function m2ValjAmne(id) {
+  Fysik.valjAmne(id);
+  TIDSSKALA = Fysik.tidsskala(id);
+  M2.besokt.fill(false);
+  document.querySelectorAll('#m2-amnen button').forEach(b => b.classList.toggle('vald', b.dataset.amne === id));
+  m2Nollstall();
+  m2Meddela(`${Fysik.amne.namn}: två ${Fysik.amne.sym}-atomer som kan bilda en ${Fysik.amne.bindning}.`);
+}
+
+// Uppdraget "jämför" är klart när eleven har bildat alla tre molekylerna.
+function m2BildadMolekyl() {
+  M2.bildade.add(Fysik.amne.id);
+  if (M2.bildade.size === Object.keys(Fysik.AMNEN).length) m2Klar('jamfor');
+}
+
+function m2SattLage(lage) {
+  M2.lage = lage;
+  $('m2-lage-hand').classList.toggle('vald', lage === 'hand');
+  $('m2-lage-fri').classList.toggle('vald', lage === 'fri');
+  $('m2-atom-etikett').textContent = lage === 'hand'
+    ? 'Håll ned musknappen på den högra atomen och dra'
+    : 'Dra den högra atomen åt höger och släpp (eller ← → och mellanslag)';
+  m2Nollstall();
+}
+
+function m2SattOmgivning(pa) {
+  M2.omgivning = pa;
+  m2AvbrytUtskick();
+  $('m2-omg-av').classList.toggle('vald', !pa);
+  $('m2-omg-pa').classList.toggle('vald', pa);
+  m2VisaFraga();
+}
+
+// Förutsägelsen krävs första gången eleven knuffar utan omgivning.
+function m2BehoverGissning() {
+  return M2.lage === 'fri' && !M2.omgivning && M2.gissning === null;
+}
+function m2VisaFraga() { $('m2-fraga').hidden = !(m2BehoverGissning() && !M2.iFlykt); }
+
+function m2Gissa(g) {
+  M2.gissning = g;
+  m2VisaFraga();
+  m2Meddela('Bra. Knuffa nu och se om du hade rätt.');
+}
+
+function m2MusTillR(x, w) {
+  return (x - m2Centrum(w)) / m2Skala(w);
+}
+
+function m2Ned(e) {
+  const c = $('m2-atomer');
+  const rect = c.getBoundingClientRect();
+  const x = e.clientX - rect.left, w = rect.width;
+  const s = m2Skala(w);
+  const xB = m2Centrum(w) + m2Scen(M2.par.r) * s;
+  if (Math.abs(x - xB) > m2AtomRad() * s + 10) return;
+  e.preventDefault();
+  if (M2.lage === 'fri') {
+    if (M2.iFlykt && !M2.utfallVisat) return;
+    if (m2BehoverGissning()) { m2Meddela('Svara på frågan först: vad tror du händer?', 'obs'); return; }
+    M2.par = Fysik.nyttPar();
+    M2.knuffKj = 0;
+    M2.iFlykt = false;
+  }
+  m2AvbrytUtskick();
+  M2.haller = true;
+  M2.grepp = m2Scen(M2.par.r) - m2MusTillR(x, w);
+  c.classList.add('drar');
+  c.setPointerCapture(e.pointerId);
+  m2Flytt(e);
+}
+
+function m2Flytt(e) {
+  if (!M2.haller) return;
+  const c = $('m2-atomer');
+  const rect = c.getBoundingClientRect();
+  const r = m2Red(m2MusTillR(e.clientX - rect.left, rect.width) + M2.grepp);
+  if (M2.lage === 'hand') {
+    M2.mal = Math.min(Math.max(r, Fysik.R_MIN_MAL), Fysik.R_MAX - 0.1);
+  } else {
+    M2.drag = Math.min(Math.max(r - Fysik.R_START, 0), Fysik.DRAG_MAX);
+  }
+}
+
+function m2Upp() {
+  if (!M2.haller) return;
+  M2.haller = false;
+  $('m2-atomer').classList.remove('drar');
+  if (M2.lage === 'fri') { m2Knuffa(); return; }
+  const Es = Fysik.systemEnergi(M2.par);
+  m2Meddela(Es < -0.02 * Fysik.D
+    ? 'Du släppte. Systemets energi ligger under noll, så atomerna kan inte komma loss. De svänger fram och tillbaka.'
+    : 'Du släppte. Systemets energi ligger inte under noll, så det krävs ingen energi för att få isär atomerna.');
+}
+
+function m2Knuffa() {
+  const v = Fysik.startfart(M2.drag);
+  M2.drag = 0;
+  if (v === 0) { m2Meddela('För svag knuff. Dra längre åt höger innan du släpper.', 'obs'); return; }
+  m2AvbrytUtskick();
+  M2.par = Fysik.nyttPar(Fysik.R_START, v);
+  // Knuffen tillför rörelseenergi utifrån. Den syns i summan, som sedan inte ändras.
+  M2.knuffKj = 0.5 * Fysik.MU * v * v * Fysik.KJ;
+  M2.iFlykt = true;
+  M2.utfallVisat = false;
+  M2.tidBunden = 0;
+  M2.forraIdx = null;
+  m2VisaFraga();
+  m2Meddela(`Knuffen gav atomerna ${fmt(M2.knuffKj)} kJ/mol rörelseenergi. Följ den streckade linjen i grafen.`);
+}
+
+function m2Tangent(e) {
+  if (M2.lage === 'hand') {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      M2.mal = Math.min(Math.max(M2.mal + (e.key === 'ArrowLeft' ? -0.05 : 0.05), Fysik.R_MIN_MAL), Fysik.R_MAX - 0.1);
+    }
+    return;
+  }
+  if (M2.iFlykt && !M2.utfallVisat) return;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    if (M2.iFlykt) { M2.par = Fysik.nyttPar(); M2.knuffKj = 0; M2.iFlykt = false; }
+    if (m2BehoverGissning()) { m2Meddela('Svara på frågan först: vad tror du händer?', 'obs'); return; }
+    M2.drag = Math.min(Math.max(M2.drag + (e.key === 'ArrowRight' ? 0.1 : -0.1), 0), Fysik.DRAG_MAX);
+  } else if (e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    if (M2.drag > 0) m2Knuffa();
+  }
+}
+
+// Fysiken framåt motsvarande verklig tid.
+function m2Uppdatera(sek) {
+  const p = M2.par;
+  const handGrepp = M2.lage === 'hand' && M2.haller;
+  const tangentHand = M2.lage === 'hand' && !M2.haller && document.activeElement === $('m2-atomer') && M2.tangentAktiv;
+  const hand = handGrepp || tangentHand;
+  // Vid start står atomerna stilla tills eleven rört dem; annars skulle den
+  // svaga attraktionen vid 370 pm långsamt dra ihop dem av sig själv.
+  if (hand) M2.aktiv = true;
+  const fri = M2.lage === 'hand' ? !hand && M2.aktiv : M2.iFlykt;
+  if (!hand && !fri) return;
+  // Atomerna har glidit ut ur bilden. Rörelsen fryses, men farten nollställs inte:
+  // rörelseenergin finns kvar, så energisumman ändras inte.
+  if (!hand && p.r > Fysik.R_MAX) { m2AvbrytUtskick(); m2Utfall(sek); return; }
+  const n = Math.min(Math.round(sek * TIDSSKALA / DT), 200);
+  const o = { hand, mal: M2.mal, omgivning: M2.omgivning };
+  if (!hand) m2PlaneraKrock(o);
+  for (let i = 0; i < n; i++) {
+    const k = p.krockar;
+    Fysik.steg(p, DT, o);
+    M2.simTid += DT;
+    if (p.krockar > k) m2KrockSkedde(p.senasteKrock);
+    if (p.r > Fysik.R_MAX) break;
+  }
+  if (!hand) M2.mal = p.r;
+  const idx = Math.min(Math.max(Math.round(p.r * Fysik.PM / KURVA_PM * (M2.besokt.length - 1)), 0), M2.besokt.length - 1);
+  const fran = M2.forraIdx ?? idx;
+  for (let i = Math.min(fran, idx); i <= Math.max(fran, idx); i++) M2.besokt[i] = true;
+  M2.forraIdx = idx;
+  m2Utfall(sek);
+}
+
+function m2Utfall(sek) {
+  const p = M2.par;
+  const Es = Fysik.systemEnergi(p);
+  if (M2.lage === 'hand') {
+    if (M2.haller && Math.abs(p.r - 1) < 0.12 && Es < -0.9) {
+      if (!M2.klara.has('bind')) m2Meddela('Lägsta möjliga energi! Den energi systemet förlorat har din hand tagit emot.', 'bra');
+      m2Klar('bind');
+      m2BildadMolekyl();
+    }
+    if (M2.haller && p.r < 0.6) {
+      if (!M2.klara.has('vagg')) m2Meddela('Atomerna trycker tillbaka. Elektronmolnen och kärnorna stöter bort varandra, och systemets energi stiger.', 'obs');
+      m2Klar('vagg');
+    }
+    return;
+  }
+  if (!M2.iFlykt || M2.utfallVisat) return;
+  if (p.r >= Fysik.R_MAX && p.v >= 0) {
+    M2.utfallVisat = true;
+    M2.iFlykt = false;
+    m2AvbrytUtskick();
+    let text = 'Atomerna studsade isär. Energin som frigjordes när de närmade sig hade ingenstans att ta vägen, så den blev rörelseenergi som förde dem isär igen.';
+    if (!M2.omgivning) text += ' I verkligheten kan energin också lämna som ljus eller till en yta, men för två ensamma atomer av samma slag är det mycket ovanligt.';
+    if (M2.omgivning) text = 'Atomerna studsade isär. Den här gången hann ingen kvävemolekyl krocka och ta bort tillräckligt med energi medan atomerna var nära varandra. Knuffa igen – oftast fastnar de.';
+    if (M2.gissning === 'fast') text = 'Du gissade att de skulle fastna, men de studsade isär. ' + text;
+    if (M2.gissning === 'studs') text = 'Rätt gissat! ' + text;
+    m2Meddela(text, M2.omgivning ? 'obs' : 'bra');
+    if (!M2.omgivning) m2Klar('studs');
+    return;
+  }
+  if (Es < 0 && p.r < 2) {
+    M2.tidBunden += sek;
+    if (M2.tidBunden > 2.5) {
+      M2.utfallVisat = true;
+      m2Meddela(M2.lage === 'fri'
+        ? 'En molekyl har bildats! Kvävet förde bort energin, så systemet ligger under noll. Krockarna fortsätter, men byter nu bara några kJ/mol åt båda hållen – för lite för att bryta bindningen.'
+        : 'En molekyl har bildats! Omgivningen tog emot energin, så systemet ligger nu under noll och atomerna kan inte komma loss.', 'bra');
+      if (M2.omgivning) m2Klar('fangad');
+      m2BildadMolekyl();
+    }
+  }
+}
+
+function m2Rita(tid) {
+  const sek = Math.min((tid - (M2.forraTid || tid)) / 1000, 0.05);
+  M2.forraTid = tid;
+  if (aktivVy === 'm2') {
+    m2Uppdatera(sek);
+    m2RitaAtomer(sek);
+    m2RitaKurva();
+    m2RitaKonto();
+  }
+  requestAnimationFrame(m2Rita);
+}
+
+// ---------------------------------------------------------------------
+// Omgivningens N2-molekyler. Storlekar i r0-enheter (74 pm) med samma
+// konvention för båda ämnena: radierna står i proportion till van der
+// Waals-radierna (H 120 pm, N 155 pm), N–N-avståndet är 110 pm.
+// ---------------------------------------------------------------------
+const RESTID = 1.5;                        // simtid för en molekyl att flyga fram
+
+function m2HemLagen() {
+  return [
+    // En ovanför, en under och en stående längst till höger: de överlappar inte
+    // varandra och ryms på höjden även när de vickar.
+    { x: 8.9, y: -1.5, vinkel: 0.1 },
+    { x: 12.5, y: 0, vinkel: 1.5 },
+    { x: 8.9, y: 1.5, vinkel: -0.1 },
+  ];
+}
+
+function m2NyaMolekyler() {
+  M2.molekyler = m2HemLagen().map((hem, i) => ({
+    hem, x: hem.x, y: hem.y, vinkel: hem.vinkel, fas: i * 2.1,
+    lage: 'vandrar', vx: 0, vy: 0, energi: 0, tillbakaOm: 0,
+  }));
+  M2.utskick = null;
+  M2.etiketter = [];
+}
+
+// Molekylen träffar B-atomen snett från höger, ovanifrån (sida = -1) eller
+// underifrån, längs vinkeln KROCK_VINKEL.
+const KROCK_VINKEL = 0.55;
+function m2Riktning(sida) { return { x: Math.cos(KROCK_VINKEL), y: sida * Math.sin(KROCK_VINKEL) }; }
+// Var molekylens mittpunkt ska vara för att dess närmaste N-kärna ska nudda B;
+// molekylen ligger längs riktningen, med den andra kärnan längre bort.
+function m2Kontaktlage(sida, r) {
+  const d = m2Riktning(sida);
+  const kontakt = m2AtomRad() + N_RAD;      // kärnavstånd atom–N vid krock
+  return { x: m2Scen(r) + d.x * (kontakt + N_N / 2), y: d.y * (kontakt + N_N / 2) };
+}
+
+// Nästa krocks tid är lottad i förväg (par.nastaKrock). Kör en kopia av paret
+// med samma steg fram till dess för att få reda på var B-atomen står då.
+// Kopian körs utan omgivning så att den inte drar några slumptal.
+function m2ForutsagKrock(o) {
+  const kopia = { ...M2.par };
+  const utan = { ...o, omgivning: false };
+  let t = 0;
+  while (kopia.tid < kopia.nastaKrock) {
+    Fysik.steg(kopia, DT, utan);
+    t += DT;
+    if (kopia.r > Fysik.R_MAX) return null;
+  }
+  return { tid: t, r: kopia.r };
+}
+
+function m2PlaneraKrock(o) {
+  if (!M2.omgivning || M2.utskick) return;
+  if (M2.molekyler.length === 0) m2NyaMolekyler();
+  const prognos = m2ForutsagKrock(o);
+  if (prognos === null) return;
+  // Vandrande molekyler i första hand; annars en som är på väg tillbaka eller
+  // har lämnat bilden (den kommer då in som en ny, sval molekyl från kanten).
+  // Krockarna växlar mellan ovansidan och undersidan så att en molekyl på väg
+  // hem inte möter nästa på väg in.
+  const sidaNu = -(M2.forraSida || 1);
+  const pasida = m => (m.hem.y < 0 ? -1 : 1) === sidaNu;
+  const lediga = M2.molekyler.filter(m => m.lage === 'vandrar');
+  const reserv = M2.molekyler.filter(m => m.lage === 'atervander' || m.lage === 'borta');
+  const urval = [lediga.filter(pasida), lediga, reserv.filter(pasida), reserv].find(l => l.length) || [];
+  if (urval.length === 0) return;
+  const mol = urval[Math.floor(Math.random() * urval.length)];
+  if (mol.lage === 'borta') { mol.x = m2Utanfor(); mol.y = mol.hem.y; mol.vinkel = mol.hem.vinkel; }
+  mol.energi = 0;            // en "ny" molekyl ur luften kommer in grå
+  mol.lage = 'vandrar';
+  const sida = mol.hem.y < 0 ? -1 : 1;
+  M2.forraSida = sida;
+  const vinkel = sida * KROCK_VINKEL;
+  const tTraff = M2.simTid + prognos.tid;
+  M2.utskick = { mol, sida, vinkel, tTraff, tStart: Math.max(M2.simTid, tTraff - RESTID), till: m2Kontaktlage(sida, prognos.r) };
+}
+
+// En planerad krock som inte längre kommer att ske (ny knuff, handen tar tag, omgivningen stängs av).
+function m2AvbrytUtskick() {
+  if (!M2.utskick) return;
+  const m = M2.utskick.mol;
+  if (m.lage === 'kommer' || m.lage === 'vandrar') m.lage = 'atervander';
+  M2.utskick = null;
+}
+
+function m2KrockSkedde(dE) {
+  if (M2.molekyler.length === 0) m2NyaMolekyler();
+  // Saknas en planerad molekyl (bör inte hända) får den första stå för krocken.
+  const r = M2.par.r;
+  const u = M2.utskick || { mol: M2.molekyler[0], sida: -1, vinkel: -KROCK_VINKEL, till: m2Kontaktlage(-1, r) };
+  const mol = u.mol;
+  mol.x = u.till.x; mol.y = u.till.y; mol.vinkel = u.vinkel;
+  const kj = dE * Fysik.KJ;
+  // Orange: molekylen tog emot energi. Blå: den gav energi till paret.
+  mol.energi = kj;
+  mol.lage = 'flyr';
+  mol.flyrTid = 0;
+  // Efter ett stort utbyte far den uppvärmda molekylen ut ur bilden; efter ett
+  // litet studsar den en bit och vänder hem, så att den snart kan krocka igen.
+  mol.lamnar = Math.abs(kj) > 20;
+  // Ju mer energi molekylen fått, desto snabbare far den iväg.
+  const fart = 0.5 + 0.06 * Math.sqrt(Math.abs(kj));     // r0 per simtidsenhet
+  const sida = u.sida;
+  const d = m2Riktning(sida);
+  mol.vx = d.x * fart;
+  mol.vy = d.y * fart;
+  const text = Math.round(kj) > 0 ? '+' + fmt(kj) : Math.round(kj) < 0 ? fmt(kj) : '±0';
+  M2.etiketter.push({ x: m2Scen(r) + d.x * m2AtomRad(), y: d.y * (m2AtomRad() + 0.5), text: text + ' kJ/mol', farg: kj >= 0.5 ? 'warm' : kj <= -0.5 ? 'energi-ut' : 'energi-noll', alder: 0 });
+  M2.utskick = null;
+}
+
+// Uppdaterar och ritar molekylerna. Rörelse i simtid så att krocken sammanfaller med fysiken.
+function m2RitaMolekyler(ctx, s, cx, y, rad, w, h, sek) {
+  if (M2.molekyler.length === 0) m2NyaMolekyler();
+  const dtSim = sek * TIDSSKALA;
+  const nu = M2.simTid;
+  const u = M2.utskick;
+  const ut = m2Utanfor();
+  for (const m of M2.molekyler) {
+    if (u && u.mol === m && nu >= u.tStart) {
+      if (m.lage === 'vandrar') { m.lage = 'kommer'; m.fran = { x: m.x, y: m.y, vinkel: m.vinkel }; m.fStart = nu; }
+      const a = Math.min((nu - m.fStart) / Math.max(u.tTraff - m.fStart, 1e-6), 1);
+      const e = 1 - (1 - a) * (1 - a);
+      m.x = m.fran.x + (u.till.x - m.fran.x) * e;
+      m.y = m.fran.y + (u.till.y - m.fran.y) * e;
+      m.vinkel = m.fran.vinkel + (u.vinkel - m.fran.vinkel) * e;
+    } else if (m.lage === 'flyr') {
+      m.x += m.vx * dtSim; m.y += m.vy * dtSim; m.vinkel += 0.8 * dtSim;
+      m.flyrTid += sek;
+      const borta = m.x > ut || Math.abs(m.y) > 4.5;
+      if (borta) { m.lage = 'borta'; m.tillbakaOm = 0.8; }
+      else if (!m.lamnar && m.flyrTid > 0.5) m.lage = 'atervander';
+    } else if (m.lage === 'borta') {
+      // Den uppvärmda molekylen har försvunnit ut i omgivningen; en ny sval
+      // molekyl driver in från kanten.
+      m.tillbakaOm -= sek;
+      if (m.tillbakaOm <= 0) { m.lage = 'atervander'; m.energi = 0; m.x = ut; m.y = m.hem.y; m.vinkel = m.hem.vinkel; }
+    } else if (m.lage === 'atervander') {
+      const f = Math.min(1, 1.5 * dtSim);
+      m.x += (m.hem.x - m.x) * f; m.y += (m.hem.y - m.y) * f; m.vinkel += (m.hem.vinkel - m.vinkel) * f;
+      if (Math.hypot(m.x - m.hem.x, m.y - m.hem.y) < 0.05) { m.lage = 'vandrar'; m.fas = 0; m.energi = 0; }
+    } else {
+      m.fas += dtSim * 0.4;
+      m.x = m.hem.x + 0.25 * Math.sin(m.fas);
+      m.y = m.hem.y + 0.15 * Math.sin(m.fas * 1.3);
+      m.vinkel = m.hem.vinkel + 0.2 * Math.sin(m.fas * 0.7);
+    }
+    if (m.lage !== 'borta') m2RitaN2(ctx, cx + m.x * s, y + m.y * s, m.vinkel, N_RAD * s, N_N * s, m.energi);
+  }
+  // Flytande energietiketter
+  ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center';
+  // Kort livstid och snabb glidning bort från paret, så att täta krockar
+  // inte staplar etiketterna på varandra.
+  const LIV = 1.1;
+  M2.etiketter = M2.etiketter.filter(e => e.alder < LIV);
+  for (const e of M2.etiketter) {
+    e.alder += sek;
+    ctx.fillStyle = Tema.rgba(e.farg, 1 - e.alder / LIV);
+    ctx.fillText(e.text, cx + e.x * s - 70, y + e.y * s + Math.sign(e.y) * 45 * e.alder);
+  }
+}
+
+function m2RitaN2(ctx, x, y, vinkel, r, avst, energi) {
+  // Grå i vila; orange om molekylen fick energi vid krocken, blå om den gav energi.
+  // Även små utbyten syns tydligt (minst 40 % färg från 1 kJ/mol).
+  const styrka = Math.abs(energi) < 0.5 ? 0 : Math.min(0.4 + Math.abs(energi) / 250, 1);
+  const mal = energi >= 0 ? [255, 159, 67] : [90, 150, 255];
+  const kol = [0, 1, 2].map(i => Math.round([140, 150, 160][i] + (mal[i] - [140, 150, 160][i]) * styrka));
+  for (const t of [-0.5, 0.5]) {
+    const nx = x + Math.cos(vinkel) * avst * t, ny = y + Math.sin(vinkel) * avst * t;
+    const g = ctx.createRadialGradient(nx - r * 0.3, ny - r * 0.3, r * 0.1, nx, ny, r);
+    g.addColorStop(0, `rgba(${kol[0] + 40},${kol[1] + 40},${kol[2] + 40},0.95)`);
+    g.addColorStop(1, `rgba(${kol[0] - 60},${kol[1] - 60},${kol[2] - 60},0.75)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(nx, ny, r, 0, 6.29); ctx.fill();
+    ctx.fillStyle = '#0d1520'; ctx.font = 'bold 18px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('N', nx, ny + 1);
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+
+function m2RitaAtomer(sek) {
+  const c = $('m2-atomer');
+  const { ctx, w, h } = forberedDuk(c);
+  ctx.clearRect(0, 0, w, h);
+  const s = m2Skala(w), cx = m2Centrum(w), y = h / 2;
+  const p = M2.par;
+  const xA = cx, xB = cx + m2Scen(p.r) * s;
+  // Atomerna överlappar vid bindningsavståndet, som elektronmolnen gör.
+  const rad = m2AtomRad() * s;
+
+  if (M2.omgivning) {
+    m2RitaMolekyler(ctx, s, cx, y, rad, w, h, sek);
+    ctx.fillStyle = Tema.farg('dim2'); ctx.font = '13px system-ui'; ctx.textAlign = 'right';
+    ctx.fillText('Omgivning: kvävemolekyler (N₂) i luften', w - 12, 40);
+  } else {
+    ctx.fillStyle = Tema.farg('text-dim');
+    ctx.font = '13px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText('Inget runt omkring – bara de två atomerna', w - 12, 40);
+  }
+
+  // Slangbellan
+  if (M2.lage === 'fri' && !M2.iFlykt && M2.drag > 0) {
+    const xDrag = cx + m2Scen(Fysik.R_START + M2.drag) * s;
+    ctx.strokeStyle = Tema.farg('dim2'); ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(xB, y); ctx.lineTo(xDrag, y); ctx.stroke(); ctx.setLineDash([]);
+    const len = (M2.drag / Fysik.DRAG_MAX) * 2.6 * s;
+    const ya = y + rad + 14;
+    ctx.strokeStyle = Tema.farg('warm'); ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(xB, ya); ctx.lineTo(xB - len, ya); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(xB - len - 10, ya); ctx.lineTo(xB - len + 2, ya - 7); ctx.lineTo(xB - len + 2, ya + 7); ctx.closePath();
+    ctx.fillStyle = Tema.farg('warm'); ctx.fill();
+    ctx.font = '13px system-ui'; ctx.textAlign = 'right';
+    const ke = Math.min(M2.drag / Fysik.DRAG_MAX, 1) * Fysik.KE_MAX;
+    ctx.fillText(`knuff: ${fmt(ke * Fysik.KJ)} kJ/mol rörelseenergi`, xB - len - 16, ya + 5);
+  }
+
+  // Handens fjäder – sträcks när atomen inte lyder.
+  if (M2.lage === 'hand' && (M2.haller || M2.tangentAktiv)) {
+    const xMal = cx + m2Scen(M2.mal) * s;
+    const stretch = Math.abs(xMal - xB);
+    const skak = stretch > 8 ? (Math.random() - 0.5) * Math.min(stretch / 10, 4) : 0;
+    ctx.strokeStyle = stretch > 15 ? Tema.farg('warm') : Tema.farg('dim2');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const n = 10;
+    for (let i = 0; i <= n; i++) {
+      const xx = xB + (xMal - xB) * i / n;
+      const yy = y + rad + 14 + (i % 2 ? 5 : -5) * (i > 0 && i < n ? 1 : 0) + skak;
+      if (i === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(xB, y + rad - 4); ctx.lineTo(xB, y + rad + 14); ctx.stroke();
+    ctx.fillStyle = Tema.farg('warm');
+    ctx.beginPath(); ctx.arc(xMal, y + rad + 14 + skak, 6, 0, 6.29); ctx.fill();
+    ctx.fillStyle = Tema.farg('dim2'); ctx.font = '12px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('din hand', xMal, y + rad + 36);
+  }
+
+  const sym = Fysik.amne.sym;
+  for (const [x, namn] of [[xA, sym], [xB, sym]]) {
+    const g = ctx.createRadialGradient(x - rad * 0.3, y - rad * 0.3, rad * 0.1, x, y, rad);
+    g.addColorStop(0, Tema.rgba('moln-inre', 0.95));
+    g.addColorStop(1, Tema.rgba('moln-yttre', 0.55));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.29); ctx.fill();
+    ctx.fillStyle = '#0d1520'; ctx.font = 'bold 20px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(namn, x, y + 1);
+    ctx.textBaseline = 'alphabetic';
+  }
+  ctx.fillStyle = Tema.farg('text'); ctx.font = '13px system-ui'; ctx.textAlign = 'right';
+  ctx.fillText(`avstånd ${fmt(p.r * Fysik.PM)} pm`, w - 12, 22);
+}
+
+function m2RitaKurva() {
+  const c = $('m2-kurva');
+  const { ctx, w, h } = forberedDuk(c);
+  ctx.clearRect(0, 0, w, h);
+  const X = pm => m2KurvaX(pm, w), Y = kj => m2KurvaY(kj, h);
+  // Axlar och rutnät
+  ctx.font = '12px system-ui'; ctx.fillStyle = Tema.farg('text-dim'); ctx.strokeStyle = Tema.farg('border'); ctx.lineWidth = 1;
+  ctx.textAlign = 'right';
+  for (let kj = -1000; kj <= 400; kj += 200) {
+    const y = Y(kj);
+    ctx.beginPath(); ctx.moveTo(50, y); ctx.lineTo(w - 20, y); ctx.stroke();
+    ctx.fillText(kj > 0 ? '+' + kj : String(kj).replace('-', '−'), 45, y + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let pm = 0; pm <= 400; pm += 50) ctx.fillText(pm, X(pm), h - 8);
+  ctx.strokeStyle = Tema.farg('text-dim'); ctx.setLineDash([2, 3]);
+  ctx.beginPath(); ctx.moveTo(50, Y(0)); ctx.lineTo(w - 20, Y(0)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.textAlign = 'right'; ctx.fillText('0 = atomerna långt isär', w - 24, Y(0) - 6);
+
+  const PM_MIN = 20;
+  const kurva = (fn, farg, bredd) => {
+    ctx.strokeStyle = farg; ctx.lineWidth = bredd;
+    ctx.beginPath();
+    let forst = true;
+    for (let pm = PM_MIN; pm <= Fysik.MAX_PM; pm += 1) {
+      const kj = fn(pm); if (kj > KURVA_MAX) { forst = true; continue; }
+      if (forst) { ctx.moveTo(X(pm), Y(kj)); forst = false; } else ctx.lineTo(X(pm), Y(kj));
+    }
+    ctx.stroke();
+  };
+  const aktiv = Fysik.amne.id;
+  // De andra molekylernas kurvor, för jämförelse
+  if ($('m2-jamfor').checked) {
+    for (const id of Object.keys(Fysik.AMNEN)) {
+      if (id === aktiv) continue;
+      const m = Fysik.AMNEN[id];
+      kurva(pm => Fysik.vKj(id, pm), Tema.rgba('text', 0.35), 2);
+      ctx.fillStyle = Tema.rgba('text', 0.7); ctx.textAlign = 'left';
+      ctx.fillText(`${m.namn} (${m.D} kJ/mol)`, X(m.r0) + 10, Y(-m.D) + 4);
+    }
+  }
+  const enAktiv = pm => Fysik.V(pm / Fysik.PM) * Fysik.KJ;
+  if ($('m2-hela-kurvan').checked || $('m2-jamfor').checked) kurva(enAktiv, Tema.rgba('accent', 0.3), 2);
+  if ($('m2-jamfor').checked) {
+    ctx.fillStyle = Tema.farg('accent'); ctx.textAlign = 'left';
+    ctx.fillText(`${Fysik.amne.namn} (${Fysik.amne.D} kJ/mol)`, X(Fysik.amne.r0) + 10, Y(-Fysik.amne.D) + 4);
+  }
+  // Den del av kurvan eleven själv har besökt
+  const N = M2.besokt.length;
+  ctx.strokeStyle = Tema.farg('accent'); ctx.lineWidth = 3;
+  ctx.beginPath();
+  let pa = false;
+  for (let i = 0; i < N; i++) {
+    const pm = i / (N - 1) * KURVA_PM, kj = enAktiv(pm);
+    if (M2.besokt[i] && kj <= KURVA_MAX && pm >= PM_MIN) {
+      if (!pa) { ctx.moveTo(X(pm), Y(kj)); pa = true; } else ctx.lineTo(X(pm), Y(kj));
+    } else pa = false;
+  }
+  ctx.stroke();
+
+  // Systemets totala energi: vändpunkterna syns där linjen möter kurvan.
+  const p = M2.par, Es = Fysik.systemEnergi(p) * Fysik.KJ;
+  if (Es <= KURVA_MAX) {
+    ctx.strokeStyle = Tema.farg('accent2'); ctx.setLineDash([8, 5]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(50, Y(Es)); ctx.lineTo(w - 20, Y(Es)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = Tema.farg('accent2'); ctx.textAlign = 'center';
+    // På den sida av linjen där kurvan inte går.
+    const under = Y(enAktiv(260)) < Y(Es);
+    ctx.fillText('systemets energi', X(260), Y(Es) + (under ? 15 : -6));
+  }
+  // Nuvarande läge
+  const pmNu = p.r * Fysik.PM;
+  ctx.fillStyle = Tema.farg('stark');
+  ctx.beginPath(); ctx.arc(X(pmNu), Y(Math.min(enAktiv(pmNu), KURVA_MAX)), 6, 0, 6.29); ctx.fill();
+}
+
+function m2RitaKonto() {
+  const p = M2.par;
+  const Es = Fysik.systemEnergi(p) * Fysik.KJ;
+  const Eo = p.omg * Fysik.KJ;
+  const SKALA = Math.max(800, 1.6 * Fysik.amne.D); // kJ/mol för halva stapelfältet
+  const satt = (el, v) => {
+    const andel = Math.min(Math.abs(v) / SKALA, 1) * 50;
+    el.style.height = andel + '%';
+    el.style.top = v >= 0 ? (50 - andel) + '%' : '50%';
+  };
+  satt($('m2-stapel-sys'), Es);
+  satt($('m2-stapel-omg'), Eo);
+  $('m2-varde-sys').textContent = fmtTecken(Es) + ' kJ/mol';
+  $('m2-varde-omg').textContent = fmtTecken(Eo) + ' kJ/mol';
+  // I Håll och dra är handen omgivningen, även efter att eleven släppt: energin finns kvar där.
+  $('m2-omg-namn').textContent = M2.lage === 'hand'
+    ? (M2.omgivning ? 'din hand och kvävet' : 'din hand')
+    : (M2.omgivning ? 'kvävemolekyler' : 'ingenting');
+  const knuff = M2.knuffKj || 0;
+  $('m2-summa').textContent = 'Summa: ' + fmtTecken(Es + Eo) + ' kJ/mol' +
+    (knuff ? ` (knuffen tillförde ${fmtTecken(knuff)}, sedan ändras summan inte)` : ' (ändras inte)');
+}
+
+// =====================================================================
+// MODUL 3
+// =====================================================================
+const M3_PAR = [
+  { a: 'H', b: 'H', enA: 2.20, enB: 2.20 },
+  { a: 'H', b: 'C', enA: 2.20, enB: 2.55 },
+  { a: 'H', b: 'Cl', enA: 2.20, enB: 3.16 },
+  { a: 'H', b: 'O', enA: 2.20, enB: 3.44 },
+  { a: 'H', b: 'F', enA: 2.20, enB: 3.98 },
+  { a: 'Na', b: 'Cl', enA: 0.93, enB: 3.16 },
+  { a: 'Cs', b: 'F', enA: 0.79, enB: 3.98 },
+];
+const M3 = { dEN: 0, par: M3_PAR[0], buffert: null };
+
+function m3ByggForval() {
+  const f = $('m3-forval');
+  for (const p of M3_PAR) {
+    const b = document.createElement('button');
+    b.className = 'knapp';
+    b.textContent = `${p.a}–${p.b}`;
+    b.title = `ΔEN = ${fmt(p.enB - p.enA, 2)}`;
+    b.addEventListener('click', () => {
+      M3.par = p;
+      $('m3-reglage').value = (p.enB - p.enA).toFixed(2);
+      m3Satt(p.enB - p.enA, true);
+    });
+    f.appendChild(b);
+  }
+}
+
+function m3Satt(dEN, franForval = false) {
+  M3.dEN = dEN;
+  if (!franForval && M3.par && Math.abs((M3.par.enB - M3.par.enA) - dEN) > 0.03) M3.par = null;
+  m3Rita();
+}
+
+function m3Rita() {
+  const dEN = M3.dEN;
+  const f = Fysik.jonkaraktar(dEN);
+  const andel = Fysik.andelB(dEN);
+  const namnA = M3.par ? M3.par.a : 'A', namnB = M3.par ? M3.par.b : 'B';
+  $('m3-den').textContent = fmt(dEN, 2);
+  $('m3-markor').style.left = (dEN / 3.3 * 100) + '%';
+  $('m3-andel').textContent = fmt(andel * 100) + ' %';
+  $('m3-jon').textContent = fmt(f * 100) + ' %';
+  $('m3-namn-b').textContent = namnA === namnB ? `${namnB}-atomen till höger` : namnB;
+  document.querySelectorAll('#m3-forval button').forEach((b, i) => b.classList.toggle('vald', M3.par === M3_PAR[i]));
+  $('m3-not').textContent = M3.par && M3.par.a === 'Na'
+    ? 'Detta är en ensam NaCl-molekyl i gasfas. I en kristall omges varje jon av sex joner med motsatt laddning, se modul 1 Krafterna.'
+    : (dEN === 0 ? 'Lika elektronegativa atomer delar lika.' : '');
+
+  const c = $('m3-moln');
+  if (!c.clientWidth) return;
+  const { ctx, w, h } = forberedDuk(c);
+  ctx.clearRect(0, 0, w, h);
+  const cy = h / 2 + 10, dx = Math.min(110, w / 6);
+  const xA = w / 2 - dx, xB = w / 2 + dx;
+
+  // Elektrontäthet ψ² med ψ = cA·φA + cB·φB, φ = e^(−r/a).
+  const steg = 3, bw = Math.ceil(w / steg), bh = Math.ceil(h / steg);
+  if (!M3.buffert || M3.buffert.width !== bw || M3.buffert.height !== bh) {
+    M3.buffert = document.createElement('canvas');
+    M3.buffert.width = bw; M3.buffert.height = bh;
+  }
+  const bctx = M3.buffert.getContext('2d');
+  const img = bctx.createImageData(bw, bh);
+  const cA = Math.sqrt((1 - f) / 2), cB = Math.sqrt((1 + f) / 2);
+  const a = dx * 0.6;
+  const tat = new Float32Array(bw * bh);
+  let max = 0;
+  for (let j = 0; j < bh; j++) {
+    for (let i = 0; i < bw; i++) {
+      const x = i * steg, y = j * steg;
+      const rA = Math.hypot(x - xA, y - cy), rB = Math.hypot(x - xB, y - cy);
+      const psi = cA * Math.exp(-rA / a) + cB * Math.exp(-rB / a);
+      const d = psi * psi;
+      tat[j * bw + i] = d;
+      if (d > max) max = d;
+    }
+  }
+  // Fast referens (det symmetriska fallets maximum) så att molnet blir
+  // tätare hos B och tunnare hos A i takt med reglaget.
+  const ref = Math.pow(Math.SQRT1_2 * (1 + Math.exp(-2 * dx / a)), 2);
+  // Linjär skala så att skillnaden mellan A- och B-sidan syns. Ingen
+  // konturlinje: en kontur byter form (en ögla blir två) vid ett visst ΔEN
+  // och skulle rita in just den skarpa gräns som modulen vill motverka.
+  const ljust = Tema.aktuellt() === 'ljust';
+  for (let k = 0; k < tat.length; k++) {
+    const v = Math.min(1, tat[k] / ref);
+    img.data[k * 4] = ljust ? 140 - 120 * v : 60 + 170 * v;
+    img.data[k * 4 + 1] = ljust ? 180 - 110 * v : 120 + 125 * v;
+    img.data[k * 4 + 2] = ljust ? 255 - 40 * v : 255;
+    img.data[k * 4 + 3] = 255 * Math.sqrt(v);
+  }
+  bctx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(M3.buffert, 0, 0, bw * steg, bh * steg);
+
+  // Kärnor
+  for (const [x, namn] of [[xA, namnA], [xB, namnB]]) {
+    ctx.fillStyle = Tema.farg('bg2');
+    ctx.beginPath(); ctx.arc(x, cy, 16, 0, 6.29); ctx.fill();
+    ctx.strokeStyle = Tema.farg('text'); ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = Tema.farg('stark'); ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(namn, x, cy + 1);
+  }
+  ctx.textBaseline = 'alphabetic';
+  // Elektronparets tyngdpunkt glider längs bindningsaxeln.
+  const xT = xA + andel * (xB - xA);
+  ctx.strokeStyle = Tema.farg('text-dim'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xA, cy + 62); ctx.lineTo(xB, cy + 62); ctx.stroke();
+  for (const x of [xA, (xA + xB) / 2, xB]) { ctx.beginPath(); ctx.moveTo(x, cy + 57); ctx.lineTo(x, cy + 67); ctx.stroke(); }
+  ctx.fillStyle = Tema.farg('elektron');
+  ctx.beginPath(); ctx.moveTo(xT, cy + 54); ctx.lineTo(xT + 7, cy + 62); ctx.lineTo(xT, cy + 70); ctx.lineTo(xT - 7, cy + 62); ctx.closePath(); ctx.fill();
+  ctx.font = '12px system-ui'; ctx.textAlign = 'center';
+  ctx.fillText('elektronparets tyngdpunkt', xT, cy + 86);
+  // Partialladdningar växer kontinuerligt
+  if (f > 0.02) {
+    const storlek = 13 + 22 * f;
+    ctx.font = `bold ${storlek}px system-ui`;
+    ctx.fillStyle = Tema.rgba('delta-plus', 0.4 + 0.6 * f);
+    ctx.fillText(f > 0.9 ? '+' : 'δ+', xA, cy - 40 - storlek / 2);
+    ctx.fillStyle = Tema.rgba('delta-minus', 0.4 + 0.6 * f);
+    ctx.fillText(f > 0.9 ? '−' : 'δ−', xB, cy - 40 - storlek / 2);
+  }
+  ctx.fillStyle = Tema.farg('text-dim'); ctx.font = '13px system-ui';
+  ctx.textAlign = 'left'; ctx.fillText('mindre elektronegativ', 12, h - 12);
+  ctx.textAlign = 'right'; ctx.fillText('mer elektronegativ', w - 12, h - 12);
+}
+
+// =====================================================================
+// MODUL 4
+// =====================================================================
+const M4 = {
+  tillstand: { ...Fysik.BH_START },
+  niva: 0,
+  historik: [],          // {id, gissat, dH, niva, tillstand}
+  vald: null,            // steg som väntar på gissning
+  gissning: null,
+  animering: null,       // {fran, till, start}
+  slutordningar: [],
+  reflektionVisad: false,
+};
+const M4_VY = { w: 720, h: 420, top: 30, bot: 398, emax: 800, emin: -500, x0: 80, kol: 105, bredd: 88 };
+const m4Y = e => M4_VY.top + (M4_VY.emax - e) / (M4_VY.emax - M4_VY.emin) * (M4_VY.bot - M4_VY.top);
+const m4YTillE = y => M4_VY.emax - (y - M4_VY.top) / (M4_VY.bot - M4_VY.top) * (M4_VY.emax - M4_VY.emin);
+
+function m4Meddela(text, typ = '') {
+  const m = $('m4-meddelande');
+  m.innerHTML = text;
+  m.className = 'meddelande' + (typ ? ' ' + typ : '');
+}
+
+function m4ByggHylla() {
+  const hylla = $('m4-hylla');
+  hylla.innerHTML = '';
+  // Blandad ordning så att hyllan inte avslöjar en "rätt" väg.
+  for (const id of ['ion', 'lat', 'sub', 'ea', 'dis']) {
+    const st = Fysik.BH_STEG.find(x => x.id === id);
+    const b = document.createElement('button');
+    b.className = 'kloss';
+    b.dataset.id = id;
+    b.innerHTML = `${st.namn}<span class="formel">${st.formel}</span>`;
+    b.addEventListener('click', () => m4ValjSteg(id));
+    hylla.appendChild(b);
+  }
+  m4UppdateraHylla();
+}
+
+function m4UppdateraHylla() {
+  const lagda = new Set(M4.historik.map(h => h.id));
+  document.querySelectorAll('#m4-hylla .kloss').forEach(b => {
+    b.classList.toggle('lagd', lagda.has(b.dataset.id));
+    b.classList.toggle('vald', M4.vald === b.dataset.id);
+  });
+}
+
+function m4ValjSteg(id) {
+  if (M4.animering) return;
+  if (M4.historik.some(h => h.id === id)) return;
+  const hinder = Fysik.bhHinder(M4.tillstand, id);
+  if (hinder) { M4.vald = null; m4UppdateraHylla(); m4Meddela(hinder, 'obs'); $('m4-fraga').hidden = true; m4Rita(); return; }
+  M4.vald = id;
+  m4UppdateraHylla();
+  if ($('m4-gissa-pa').checked) {
+    M4.gissning = M4.niva;
+    $('m4-fraga-text').innerHTML = `<b>${Fysik.BH_STEG.find(x => x.id === id).namn}.</b> Klicka i trappan där du tror att nivån hamnar efter steget.`;
+    $('m4-fraga').hidden = false;
+    m4Meddela('Ingen gissning är fel. Det intressanta är att jämföra efteråt.');
+    $('m4-svg').focus();
+  } else {
+    M4.gissning = null;
+    m4Genomfor();
+  }
+  m4Rita();
+}
+
+function m4Genomfor() {
+  const id = M4.vald;
+  const dH = Fysik.bhDH(id);
+  const fran = M4.niva;
+  const forra = M4.tillstand;
+  M4.tillstand = Fysik.bhUtfor(M4.tillstand, id);
+  M4.niva = fran + dH;
+  M4.historik.push({ id, gissat: M4.gissning, dH, niva: M4.niva, tillstand: { ...M4.tillstand } });
+  M4.vald = null;
+  $('m4-fraga').hidden = true;
+  M4.animering = { fran, till: M4.niva, start: performance.now() };
+  m4StartaScen(forra, M4.tillstand, Fysik.BH_TEXT[id]);
+  m4UppdateraHylla();
+  m4Logg();
+  requestAnimationFrame(m4Animera);
+}
+
+// ---------------------------------------------------------------------
+// Illustrationen under trappan
+// ---------------------------------------------------------------------
+const M4_SCEN_MS = 1400;
+const M4_FARG = { Na: '#9d86d6', 'Na+': '#9d86d6', Cl: '#4cc36a', 'Cl-': '#4cc36a', get e() { return Tema.farg('elektron'); } };
+const M4_ETIKETT = { Na: 'Na', 'Na+': 'Na⁺', Cl: 'Cl', 'Cl-': 'Cl⁻', e: '' };
+
+function m4StartaScen(franTillstand, tillTillstand, text) {
+  M4.scen = { fran: Fysik.bhScen(franTillstand), till: Fysik.bhScen(tillTillstand), start: performance.now() };
+  $('m4-scen-text').textContent = text;
+  requestAnimationFrame(m4ScenLoop);
+}
+
+function m4ScenLoop(t) {
+  if (!M4.scen) return;
+  const u = Math.min((t - M4.scen.start) / M4_SCEN_MS, 1);
+  m4RitaScen(u);
+  if (u < 1) requestAnimationFrame(m4ScenLoop);
+}
+
+function m4RitaScen(u) {
+  const svg = $('m4-scen');
+  const sc = M4.scen || { fran: Fysik.bhScen(M4.tillstand), till: Fysik.bhScen(M4.tillstand) };
+  const e = u * u * (3 - 2 * u);
+  const lerp = (a, b) => a + (b - a) * e;
+  const delar = [];
+  // Metallbiten
+  const metall = lerp(sc.fran.metall ? 1 : 0, sc.till.metall ? 1 : 0);
+  if (metall > 0.01) {
+    delar.push(`<rect x="45" y="42" width="155" height="90" rx="10" fill="rgba(157,134,214,${0.12 * metall})" stroke="rgba(157,134,214,${0.5 * metall})"/>`);
+    delar.push(`<text x="122" y="152" fill="${Tema.rgba('text', metall)}" font-size="12" font-family="system-ui" text-anchor="middle">natriummetall</text>`);
+  }
+  const fran = Object.fromEntries(sc.fran.partiklar.map(p => [p.id, p]));
+  // Joner och atomer först, elektroner överst
+  const lista = sc.till.partiklar.slice().sort((a, b) => (a.typ === 'e') - (b.typ === 'e'));
+  for (const b of lista) {
+    const a = fran[b.id];
+    const x = lerp(a.x, b.x), y = lerp(a.y, b.y), r = lerp(a.r, b.r), op = lerp(a.op, b.op);
+    if (op < 0.02) continue;
+    const typ = e < 0.5 ? a.typ : b.typ;
+    delar.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${M4_FARG[typ]}" fill-opacity="${(typ === 'e' ? 1 : 0.85) * op}" stroke="#0d1520" stroke-width="1"/>`);
+    if (M4_ETIKETT[typ] && r > 8) {
+      const fs = r > 14 ? 11 : 8;
+      delar.push(`<text x="${x.toFixed(1)}" y="${(y + fs / 3).toFixed(1)}" fill="#0d1520" font-size="${fs}" font-weight="700" font-family="system-ui" text-anchor="middle">${M4_ETIKETT[typ]}</text>`);
+    }
+  }
+  // Etikett vid de fria elektronerna
+  const fria = sc.till.partiklar.filter(p => p.typ === 'e').map(b => lerp(fran[b.id].op, b.op));
+  const friaOp = fria.reduce((a, b) => a + b, 0) / fria.length;
+  if (friaOp > 0.05) delar.push(`<text x="362" y="24" fill="${Tema.rgba('elektron', friaOp)}" font-size="12" font-family="system-ui" text-anchor="middle">fria elektroner (e⁻)</text>`);
+  // Förklaring
+  const leg = [['Na', 'natriumatom'], ['Na+', 'natriumjon'], ['Cl', 'kloratom'], ['Cl-', 'kloridjon'], ['e', 'elektron']];
+  leg.forEach(([typ, txt], i) => {
+    const x = 18 + i * 140, r = Fysik.BH_R[typ] * 0.4;   // samma storleksförhållande som i scenen
+    delar.push(`<circle cx="${x}" cy="160" r="${r}" fill="${M4_FARG[typ]}" fill-opacity="0.85"/>`);
+    delar.push(`<text x="${x + 11}" y="164" fill="${Tema.farg('text-dim')}" font-size="11" font-family="system-ui">${txt}</text>`);
+  });
+  svg.innerHTML = delar.join('');
+}
+
+function m4Animera(t) {
+  if (!M4.animering) return;
+  if (t - M4.animering.start >= 700) {
+    M4.animering = null;
+    m4Rita();
+    m4Aterkoppling();
+    return;
+  }
+  m4Rita(t);
+  requestAnimationFrame(m4Animera);
+}
+
+function m4Aterkoppling() {
+  const h = M4.historik[M4.historik.length - 1];
+  const st = Fysik.BH_STEG.find(x => x.id === h.id);
+  let text = `<b>${st.namn}:</b> ${fmtTecken(h.dH)} kJ/mol. `;
+  text += h.dH > 0 ? 'Det kostar energi. ' : 'Energi avges. ';
+  if (h.gissat !== null) {
+    const fel = Math.round(h.gissat - h.niva);
+    text += Math.abs(fel) <= 40 ? 'Din gissning låg nära!' :
+      `Du gissade ${fmtTecken(h.gissat)}, nivån blev ${fmtTecken(h.niva)}.`;
+  }
+  const s = M4.tillstand;
+  if (s.na === '+' && s.cl === '-' && !s.salt) {
+    text += `<br><br><b>Stanna upp.</b> Elektronen har flyttat från natrium till klor, och du ligger nu
+      <b>${fmtTecken(M4.niva)} kJ/mol över start</b>. Att bilda jonerna kostar alltså energi.
+      Ville natrium verkligen ge bort sin elektron? Vad är det då som gör saltet stabilt?`;
+    m4Meddela(text, 'obs');
+    return;
+  }
+  if (s.salt) {
+    const ordning = M4.historik.map(x => x.id).join(',');
+    const ny = !M4.slutordningar.includes(ordning);
+    if (ny) M4.slutordningar.push(ordning);
+    text += `<br><br><b>Klart: NaCl(s) ligger ${fmt(-M4.niva)} kJ/mol under start.</b> Det är gittret, alla jonernas
+      attraktion till varandra i kristallen, som betalar för jonbildningen och lite till.`;
+    if (M4.slutordningar.length >= 2) text += ' Du har gått olika vägar och hamnat på samma slutnivå. Energin beror bara på start och slut, inte på vägen.';
+    else text += ' Prova att börja om och ta stegen i en annan ordning. Hamnar du på samma ställe?';
+    m4Meddela(text, 'bra');
+    return;
+  }
+  m4Meddela(text + ' Välj nästa steg.');
+}
+
+function m4Logg() {
+  const tb = $('m4-logg');
+  tb.innerHTML = '';
+  for (const h of M4.historik) {
+    const st = Fysik.BH_STEG.find(x => x.id === h.id);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${st.namn}</td><td>${fmtTecken(h.dH)}</td><td>${h.gissat === null ? '–' : fmtTecken(h.gissat)}</td><td>${fmtTecken(h.niva)}</td>`;
+    tb.appendChild(tr);
+  }
+}
+
+function m4Nollstall() {
+  M4.tillstand = { ...Fysik.BH_START };
+  M4.niva = 0;
+  M4.historik = [];
+  M4.vald = null;
+  M4.gissning = null;
+  M4.animering = null;
+  M4.scen = null;
+  $('m4-scen-text').textContent = Fysik.BH_TEXT.start;
+  m4RitaScen(1);
+  $('m4-fraga').hidden = true;
+  m4UppdateraHylla();
+  m4Logg();
+  m4Meddela(M4.slutordningar.length ? 'Ny runda. Välj en annan ordning den här gången.' : 'Start: natriummetall och klorgas. Välj ett första steg.');
+  m4Rita();
+}
+
+// Musens y-position i trappans egna koordinater. getScreenCTM tar hänsyn till
+// skalning och tomma kanter när SVG:n anpassas efter både bredd och höjd.
+function m4SvgPunkt(e) {
+  const svg = $('m4-svg');
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse()).y;
+}
+
+function m4Klick(e) {
+  if (!M4.vald || $('m4-fraga').hidden) return;
+  const ev = Math.round(m4YTillE(m4SvgPunkt(e)) / 10) * 10;
+  M4.gissning = Math.min(Math.max(ev, M4_VY.emin), M4_VY.emax);
+  m4Rita();
+}
+
+function m4Tangent(e) {
+  if (!M4.vald || $('m4-fraga').hidden) return;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    const steg = e.shiftKey ? 50 : 10;
+    M4.gissning = Math.min(Math.max(M4.gissning + (e.key === 'ArrowUp' ? steg : -steg), M4_VY.emin), M4_VY.emax);
+    m4Rita();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    m4Genomfor();
+  }
+}
+
+function m4Rita(t) {
+  const svg = $('m4-svg');
+  const V = M4_VY;
+  const delar = [];
+  const linje = (x1, y1, x2, y2, farg, extra = '') => delar.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${farg}" ${extra}/>`);
+  const text = (x, y, s, farg = Tema.farg('text'), extra = '') => delar.push(`<text x="${x}" y="${y}" fill="${farg}" font-size="13" font-family="system-ui" ${extra}>${s}</text>`);
+
+  // Energiaxel
+  linje(60, V.top - 10, 60, V.bot + 10, Tema.farg('text-dim'));
+  for (let e = -400; e <= 800; e += 200) {
+    linje(56, m4Y(e), 64, m4Y(e), Tema.farg('text-dim'));
+    text(52, m4Y(e) + 4, e > 0 ? '+' + e : String(e).replace('-', '−'), Tema.farg('text-dim'), 'text-anchor="end"');
+  }
+  text(14, V.top - 20, 'Energi (kJ/mol)', Tema.farg('text-dim'));
+  // Startnivån genom hela diagrammet
+  linje(64, m4Y(0), V.w - 10, m4Y(0), Tema.farg('text-dim'), 'stroke-dasharray="4 4"');
+  text(V.w - 12, m4Y(0) - 6, 'startnivå', Tema.farg('text-dim'), 'text-anchor="end"');
+
+  const nivaer = [{ niva: 0, tillstand: Fysik.BH_START }, ...M4.historik.map(h => ({ niva: h.niva, tillstand: h.tillstand }))];
+  let animNiva = null;
+  if (M4.animering && t) {
+    const u = Math.min((t - M4.animering.start) / 700, 1);
+    const ease = u * u * (3 - 2 * u);
+    animNiva = M4.animering.fran + (M4.animering.till - M4.animering.fran) * ease;
+  }
+  nivaer.forEach((n, i) => {
+    const x = V.x0 + i * V.kol;
+    const sista = i === nivaer.length - 1;
+    const e = sista && animNiva !== null ? animNiva : n.niva;
+    const y = m4Y(e);
+    const farg = i === 0 ? Tema.farg('text') : (n.tillstand.salt ? Tema.farg('accent2') : Tema.farg('accent'));
+    // Pil från föregående nivå
+    if (i > 0) {
+      const xp = x - (V.kol - V.bredd) / 2;
+      const yp = m4Y(nivaer[i - 1].niva);
+      const upp = e > nivaer[i - 1].niva;
+      const pf = upp ? Tema.farg('danger') : Tema.farg('ner');
+      linje(V.x0 + (i - 1) * V.kol + V.bredd, yp, x, yp, Tema.farg('hjalplinje'), 'stroke-dasharray="2 3"');
+      linje(xp, yp, xp, y, pf, 'stroke-width="3"');
+      const d = upp ? -1 : 1;
+      if (Math.abs(y - yp) > 10) delar.push(`<polygon points="${xp - 6},${y - d * 10} ${xp + 6},${y - d * 10} ${xp},${y}" fill="${pf}"/>`);
+      if (animNiva === null || !sista) {
+        const dH = M4.historik[i - 1].dH;
+        text(xp + 6, (yp + y) / 2 + 4, fmtTecken(dH), pf, 'font-weight="600"');
+      }
+    }
+    linje(x, y, x + V.bredd, y, farg, 'stroke-width="4"');
+    if (animNiva === null || !sista) {
+      const [a, b] = Fysik.bhAmnen(n.tillstand);
+      // Etiketten hamnar på den sida av nivån där pilen INTE kommer in.
+      const over = i === 0 || n.niva >= nivaer[i - 1].niva;
+      const ty = over ? y - (b ? 24 : 8) : y + 18;
+      text(x + V.bredd / 2, ty, a, farg, 'text-anchor="middle"');
+      if (b) text(x + V.bredd / 2, ty + 15, b, farg, 'text-anchor="middle"');
+    }
+  });
+
+  // Spökmarkör för gissningen
+  if (M4.vald && M4.gissning !== null && !$('m4-fraga').hidden) {
+    const i = nivaer.length;
+    const x = V.x0 + i * V.kol;
+    const y = m4Y(M4.gissning);
+    linje(x - 10, y, x + V.bredd + 10, y, Tema.farg('warm'), 'stroke-width="3" stroke-dasharray="6 4"');
+    text(x + V.bredd / 2, y - 8, `din gissning: ${fmtTecken(M4.gissning)}`, Tema.farg('warm'), 'text-anchor="middle"');
+    delar.push(`<rect x="${x - 14}" y="${V.top - 10}" width="${V.bredd + 28}" height="${V.bot - V.top + 20}" fill="${Tema.rgba('warm', 0.06)}" stroke="${Tema.rgba('warm', 0.3)}" stroke-dasharray="3 3"/>`);
+  }
+  svg.innerHTML = delar.join('');
+  svg.classList.toggle('gissar', !!M4.vald && !$('m4-fraga').hidden);
+}
+
+// =====================================================================
+// MODUL 5
+// =====================================================================
+const M5_STEG = 4;                          // elektronsteg per bildruta
+const M5_FARG = { Na: '#9d86d6', Mg: '#7aa6c2', Al: '#b9c3cc', get e() { return Tema.farg('elektron'); }, get netto() { return Tema.farg('stark'); } };
+const M5 = {
+  del: 'hav',            // 'hav' | 'bojd'
+  metall: 'Na',
+  sedda: new Set(['Na']),
+  hav: { atomer: [], ram: null, el: [], batteri: false, markera: false, spar: [], markTid: 0, batTid: 0, tradFas: 0, ute: null, blixt: 0, vila: 0, klara: new Set() },
+  bojd: {
+    block: { x: 0, y: 0, vx: 0, vy: 0 }, forskjut: 0, lager: 'stilla',   // 'stilla' | 'glider'
+    gissning: null, slapptVid: 0, tid: 0, atomer: [], ram: null, el: [], klara: new Set(),
+  },
+  forraTid: 0,
+};
+// Kraftens största belopp i sidled när lagret skjuts: referens för pilen.
+const M5_REF = (() => {
+  let max = 0;
+  for (let x = 0; x <= 0.5; x += 0.01) max = Math.max(max, Math.abs(Fysik.lagerKraft({ x, y: 0 }).fx));
+  return max;
+})();
+
+function m5Meddela(text, typ = '') {
+  const m = $('m5-meddelande');
+  m.textContent = text;
+  m.className = 'meddelande' + (typ ? ' ' + typ : '');
+}
+
+function m5Klar(del, id) {
+  const K = M5[del];
+  if (K.klara.has(id)) return false;
+  K.klara.add(id);
+  const li = document.querySelector(`#m5-${del}-uppdrag li[data-id="${id}"]`);
+  if (li) li.classList.add('klar');
+  return true;
+}
+
+function m5SattDel(del) {
+  M5.del = del;
+  document.querySelectorAll('#m5-delar button').forEach(b => b.classList.toggle('vald', b.dataset.del === del));
+  document.querySelectorAll('.m5-del').forEach(e => e.classList.toggle('aktiv', e.classList.contains(del)));
+  if (del === 'bojd') {
+    m5BojdVisaFraga();
+    m5Meddela(M5.bojd.gissning === null ? 'Förutsäg först vad som händer med metallen.' : 'Skjut det övre lagret med reglaget och släpp det.');
+  } else {
+    m5Meddela('De gula prickarna är valenselektronerna. Titta på hur de rör sig mellan atomkärnorna.');
+  }
+}
+
+function m5ValjMetall(id) {
+  M5.metall = id;
+  M5.sedda.add(id);
+  document.querySelectorAll('#m5-metaller button').forEach(b => b.classList.toggle('vald', b.dataset.metall === id));
+  const m = Fysik.METALLER[id];
+  $('m5-hav-etikett').textContent = `Gula prickar: valenselektroner, ${m.val} per atom, delade av alla atomerna. Klot: atomkärnorna med de inre elektronerna.`;
+  m5HavBygg();
+  m5BojdBygg();
+  m5Staplar();
+  if (M5.sedda.size === Object.keys(Fysik.METALLER).length && m5Klar('hav', 'jamfor')) {
+    const M = Fysik.METALLER;
+    m5Meddela(`Natrium har 1 valenselektron per atom, magnesium 2 och aluminium 3. Energin för att förånga dem är ${M.Na.forang}, ${M.Mg.forang} och ${M.Al.forang} kJ/mol. Fler valenselektroner per atom ger fler delokaliserade elektroner mellan atomkärnorna, och då blir metallbindningen starkare.`, 'bra');
+  } else if (M5.del === 'hav') {
+    m5Meddela(`${m.namn[0].toUpperCase() + m.namn.slice(1)}: varje atom har ${m.val} valenselektron${m.val > 1 ? 'er' : ''}. I metallen ${m.val > 1 ? 'är de delokaliserade' : 'är den delokaliserad'}, alltså delad${m.val > 1 ? 'e' : ''} av alla atomerna.`);
+  }
+}
+
+// Staplarna med förångningsenergin; okända metaller visas med frågetecken.
+function m5Staplar() {
+  const M = Fysik.METALLER, max = Math.max(...Object.values(M).map(m => m.forang));
+  $('m5-staplar').innerHTML = Object.values(M).map(m => {
+    const sedd = M5.sedda.has(m.id), aktiv = m.id === M5.metall ? ' aktiv' : '';
+    return `<span>${m.namn} (${m.val} e⁻)</span><span class="ram"><span class="fyll${aktiv}" style="display:block;width:${sedd ? 100 * m.forang / max : 0}%"></span></span><span class="tal">${sedd ? m.forang : '?'}</span>`;
+  }).join('');
+}
+
+// ---------------------------------------------------------------------
+// Elektronhavet
+// ---------------------------------------------------------------------
+function m5HavBygg() {
+  const H = M5.hav, m = Fysik.METALLER[M5.metall];
+  H.atomer = Fysik.metallBit(m.d0);
+  H.ram = Fysik.havsRam(m.d0);
+  H.el = Fysik.nyaElektroner(H.ram, H.atomer.length * m.val);
+  H.spar = [];
+  H.ute = null;
+  H.blixt = 0;
+}
+
+function m5HavSattBatteri(pa) {
+  const H = M5.hav;
+  H.batteri = pa;
+  H.batTid = 0;
+  const k = $('m5-batteri');
+  k.textContent = pa ? 'Koppla ur batteriet' : 'Koppla in batteriet';
+  k.classList.toggle('primar', !pa);
+  if (pa) m5Meddela('Lampan lyser. Elektronerna i metallen och i tråden flyttas mot batteriets pluspol, medan atomkärnorna står kvar på sina platser. Det är elektrisk ström. Lika många elektroner kommer in i metallen från tråden till vänster som lämnar den till höger.');
+  else m5Meddela('Batteriet är urkopplat. Elektronerna rör sig lika mycket åt alla håll, så ingen ström går och lampan är släckt.');
+}
+
+function m5HavUppdatera(sek) {
+  const H = M5.hav;
+  const o = { ram: H.ram, batteri: H.batteri };
+  for (let i = 0; i < M5_STEG; i++) {
+    const e = H.el[0], x0 = e.x, y0 = e.y;
+    Fysik.elektronSteg(H.el, sek / M5_STEG, o);
+    if (!H.markera || H.ute) continue;
+    // Den markerade elektronen lämnade metallen till höger och följs ut i tråden.
+    // Objektet står nu vid vänsterkanten som en annan elektron, in från tråden.
+    if (e.x < x0 - (H.ram.x1 - H.ram.x0) / 2) { H.ute = { l: 0, y: y0 }; continue; }
+    H.spar.push([e.x, e.y]);
+  }
+  while (H.spar.length > 60 * M5_STEG) H.spar.shift();
+  if (H.batteri) {
+    H.tradFas += Fysik.E_DRIFT * sek;
+    if (H.ute) H.ute.l += Fysik.E_DRIFT * sek;
+  }
+  if (H.blixt > 0) H.blixt = Math.max(0, H.blixt - sek);
+  if (H.vila > 0) H.vila = Math.max(0, H.vila - sek);
+  if (H.ute) {
+    const c = $('m5-hav-bild');
+    if (c.clientWidth) {
+      const g = m5HavGeo(c.clientWidth, c.clientHeight);
+      if (H.ute.l * g.s >= m5UtVag(g, H.ute.y).langd) m5HavFramme();
+    }
+  }
+  if (H.markera) H.markTid += sek;
+  if (H.batteri) H.batTid += sek;
+  if (H.markera && H.markTid > 4 && !H.vila && m5Klar('hav', 'markera')) {
+    m5Meddela('Den markerade elektronen far runt mellan atomkärnorna i hela metallbiten. Den hör inte till någon särskild atom: valenselektronerna är delokaliserade, de delas av alla atomerna. Det är elektronhavet.', 'bra');
+  }
+  if (H.batteri && H.batTid > 3 && !H.vila && m5Klar('hav', 'strom')) {
+    m5Meddela('Det är bara elektronerna som flyttas genom metallen; atomkärnorna står kvar. Elektronerna far fortfarande åt alla håll, men batteriet ger dem en förskjutning mot pluspolen. I verkligheten går den förskjutningen mycket långsammare än i bilden, några centimeter i timmen. Lampan tänds ändå direkt, eftersom elektronerna i hela kretsen börjar röra sig på en gång.', 'bra');
+  }
+}
+
+// Den markerade elektronen har kommit fram till pluspolen och tagits upp i batteriet.
+// En ny elektron markeras: den som ligger närmast mitten av metallen.
+function m5HavFramme() {
+  const H = M5.hav;
+  H.ute = null;
+  H.blixt = 0.8;
+  H.vila = 8;   // låt meddelandet stå kvar en stund innan ett annat uppdrag skriver över det
+  let k = 0, bast = Infinity;
+  H.el.forEach((e, i) => { const d = Math.hypot(e.x, e.y); if (d < bast) { bast = d; k = i; } });
+  [H.el[0], H.el[k]] = [H.el[k], H.el[0]];
+  H.spar = [];
+  const forsta = m5Klar('hav', 'polen');
+  m5Meddela('Den markerade elektronen kom fram till batteriets pluspol och togs upp där, av ett ämne i batteriet som reduceras. Vid minuspolen avger ett annat ämne lika många elektroner och oxideras. Inne i batteriet är det joner som rör sig, inte elektroner. Elektronen kommer alltså inte tillbaka. Nu är en ny elektron mitt i metallen markerad.', forsta ? 'bra' : '');
+}
+
+// Skalan (px per pm) är lika för alla metaller, så att storlekarna kan jämföras.
+// Den väljs så att natrium ryms med kretsen runt om.
+function m5HavSkala(w, h) {
+  const r = Fysik.havsRam(Fysik.METALLER.Na.d0);
+  return Math.min((w - 150) / (r.x1 - r.x0), (h - 120) / (r.y1 - r.y0));
+}
+
+// Bildens mått för elektronhavet och kretsen, i px.
+function m5HavGeo(w, h) {
+  const r = M5.hav.ram, s = m5HavSkala(w, h), cx = w / 2, cy = 34 + (h - 120) / 2;
+  const X = x => cx + x * s, Y = y => cy + y * s;
+  const xV = X(r.x0), xH = X(r.x1), yO = Y(r.y0), yU = Y(r.y1), yNed = h - 46;
+  return { s, cx, X, Y, xV, xH, yO, yU, yNed, krets: m5Krets(xV, xH, (yO + yU) / 2, yNed),
+           xBat: cx + 70, xLampa: cx - 40, xBryt: cx - 150 };
+}
+// Vägen för en elektron som lämnat metallen till höger på höjden yUt (pm): längs
+// kanten till tråden och genom tråden fram till batteriets pluspol, där den tas upp.
+function m5UtVag(g, yUt) {
+  const p = [[g.xH, g.Y(yUt)], ...g.krets.slice(0, 3), [g.xBat + 6, g.yNed]];
+  let langd = 0;
+  for (let i = 1; i < p.length; i++) langd += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]);
+  return { p, langd };
+}
+
+function m5RitaAtomer(ctx, lagen, m, s, X, Y) {
+  const r = m.rJon * s;
+  for (const a of lagen) {
+    const x = X(a.x), y = Y(a.y);
+    ctx.fillStyle = M5_FARG[m.id]; ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.29); ctx.fill();
+    ctx.globalAlpha = 1; ctx.strokeStyle = '#0d1520'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = '#0d1520'; ctx.font = `bold ${r > 13 ? 13 : 10}px system-ui`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(m.id, x, y + 1);
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+function m5RitaElektroner(ctx, el, X, Y) {
+  ctx.fillStyle = M5_FARG.e;
+  for (const e of el) { ctx.beginPath(); ctx.arc(X(e.x), Y(e.y), 3, 0, 6.29); ctx.fill(); }
+}
+
+// Kretsen: tråd från metallens högra kant, ned och åt vänster förbi batteriet,
+// lampan och strömbrytaren, och upp till metallens vänstra kant. Returnerar
+// trådens punkter, i den ordning elektronerna går när strömmen går.
+function m5Krets(xV, xH, yMitt, yNed) {
+  return [[xH, yMitt], [xH + 45, yMitt], [xH + 45, yNed], [xV - 45, yNed], [xV - 45, yMitt], [xV, yMitt]];
+}
+function m5PunktPaKrets(p, l) {
+  for (let i = 1; i < p.length; i++) {
+    const L = Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]);
+    if (l <= L) { const t = l / L; return [p[i - 1][0] + t * (p[i][0] - p[i - 1][0]), p[i - 1][1] + t * (p[i][1] - p[i - 1][1])]; }
+    l -= L;
+  }
+  return p[p.length - 1];
+}
+
+function m5RitaHav() {
+  const c = $('m5-hav-bild');
+  if (!c.clientWidth) return;
+  const { ctx, w, h } = forberedDuk(c);
+  ctx.clearRect(0, 0, w, h);
+  const H = M5.hav, m = Fysik.METALLER[M5.metall];
+  const g = m5HavGeo(w, h);
+  const { s, X, Y, xV, xH, yO, yU, yNed, krets, xBat, xLampa, xBryt } = g;
+
+  // Kretsen
+  ctx.strokeStyle = Tema.farg('text-dim'); ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  krets.forEach(([x, y], i) => { if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+  ctx.stroke();
+  // Luckor i tråden för batteriet och strömbrytaren
+  ctx.fillStyle = Tema.farg('bg2');
+  ctx.fillRect(xBat - 9, yNed - 20, 18, 40);
+  ctx.fillRect(xBryt - 18, yNed - 30, 36, 34);
+  // Elektronerna i tråden: tråden är också metall och full av elektroner, som
+  // står still utan batteri och flyttas mot pluspolen med det.
+  const langd = krets.slice(1).reduce((t, p, i) => t + Math.hypot(p[0] - krets[i][0], p[1] - krets[i][1]), 0);
+  const mellan = 18, fas = (H.tradFas * s) % mellan;
+  ctx.fillStyle = M5_FARG.e;
+  for (let l = fas; l < langd; l += mellan) {
+    const [x, y] = m5PunktPaKrets(krets, l);
+    if (Math.abs(x - xBat) < 12 && Math.abs(y - yNed) < 4) continue;
+    if (Math.abs(x - xBryt) < 20 && Math.abs(y - yNed) < 4) continue;
+    ctx.beginPath(); ctx.arc(x, y, 2.5, 0, 6.29); ctx.fill();
+  }
+  // Batteriet: lång, tunn platta = pluspol (höger), kort, tjock = minuspol (vänster).
+  ctx.fillStyle = Tema.farg('text');
+  ctx.fillRect(xBat - 8, yNed - 9, 5, 18);
+  ctx.fillRect(xBat + 4, yNed - 17, 2, 34);
+  ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center';
+  ctx.fillText('−', xBat - 18, yNed - 12); ctx.fillText('+', xBat + 17, yNed - 12);
+  // Polerna: vid pluspolen tas elektroner upp (reduktion), vid minuspolen avges de (oxidation).
+  ctx.font = '11px system-ui'; ctx.fillStyle = Tema.farg('text-dim');
+  ctx.textAlign = 'left'; ctx.fillText('tar upp e⁻', xBat + 27, yNed - 12);
+  ctx.textAlign = 'right'; ctx.fillText('avger e⁻', xBat - 28, yNed - 12);
+  ctx.textAlign = 'center';
+  ctx.font = '12px system-ui';
+  ctx.fillText('batteri', xBat, yNed + 32);
+  if (H.blixt > 0) {
+    const t = 1 - H.blixt / 0.8;
+    ctx.strokeStyle = Tema.rgba('stark', 0.9 * (1 - t)); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(xBat + 6, yNed, 6 + 16 * t, 0, 6.29); ctx.stroke();
+  }
+  // Strömbrytaren
+  ctx.strokeStyle = Tema.farg('text'); ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(xBryt - 16, yNed);
+  if (H.batteri) ctx.lineTo(xBryt + 16, yNed); else ctx.lineTo(xBryt + 12, yNed - 18);
+  ctx.stroke();
+  ctx.fillStyle = Tema.farg('text');
+  for (const x of [xBryt - 16, xBryt + 16]) { ctx.beginPath(); ctx.arc(x, yNed, 3.5, 0, 6.29); ctx.fill(); }
+  ctx.fillStyle = Tema.farg('text-dim'); ctx.fillText(H.batteri ? 'sluten' : 'öppen', xBryt, yNed + 32);
+  // Lampan
+  if (H.batteri) {
+    const g = ctx.createRadialGradient(xLampa, yNed, 4, xLampa, yNed, 40);
+    g.addColorStop(0, 'rgba(255,230,140,0.9)'); g.addColorStop(1, 'rgba(255,230,140,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(xLampa, yNed, 40, 0, 6.29); ctx.fill();
+  }
+  ctx.fillStyle = H.batteri ? '#fff4c2' : Tema.farg('bg2');
+  ctx.strokeStyle = Tema.farg('text'); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(xLampa, yNed, 13, 0, 6.29); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(xLampa - 9, yNed - 9); ctx.lineTo(xLampa + 9, yNed + 9);
+  ctx.moveTo(xLampa + 9, yNed - 9); ctx.lineTo(xLampa - 9, yNed + 9); ctx.stroke();
+  ctx.fillStyle = Tema.farg('text-dim'); ctx.fillText(H.batteri ? 'lampan lyser' : 'lampa', xLampa, yNed + 32);
+
+  // Metallbiten och elektronhavet
+  ctx.fillStyle = Tema.rgba('elektron', 0.10); ctx.strokeStyle = Tema.farg('metallkant'); ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(xV, yO, xH - xV, yU - yO, 10); else ctx.rect(xV, yO, xH - xV, yU - yO);
+  ctx.fill(); ctx.stroke();
+  m5RitaAtomer(ctx, H.atomer, m, s, X, Y);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(xV, yO, xH - xV, yU - yO); ctx.clip();
+  // På väg ut i tråden är den markerade elektronen inte längre H.el[0]; där står
+  // nu en annan elektron, som kom in från tråden till vänster.
+  const markerad = H.markera && !H.ute;
+  m5RitaElektroner(ctx, markerad ? H.el.slice(1) : H.el, X, Y);
+  if (H.markera) {
+    ctx.strokeStyle = Tema.rgba('stark', 0.6); ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    H.spar.forEach((p, i) => { if (i) ctx.lineTo(X(p[0]), Y(p[1])); else ctx.moveTo(X(p[0]), Y(p[1])); });
+    ctx.stroke();
+  }
+  if (markerad) m5RitaMarkerad(ctx, X(H.el[0].x), Y(H.el[0].y));
+  ctx.restore();
+  if (H.markera && H.ute) {
+    const v = m5UtVag(g, H.ute.y);
+    const [x, y] = m5PunktPaKrets(v.p, Math.min(H.ute.l * s, v.langd));
+    m5RitaMarkerad(ctx, x, y);
+  }
+}
+function m5RitaMarkerad(ctx, x, y) {
+  ctx.fillStyle = M5_FARG.e; ctx.strokeStyle = Tema.farg('stark'); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x, y, 5.5, 0, 6.29); ctx.fill(); ctx.stroke();
+}
+
+function m5HavSiffror() {
+  const H = M5.hav, m = Fysik.METALLER[M5.metall];
+  const rader = [
+    `<span>Valenselektroner per atom</span><span class="tal">${m.val}</span>`,
+    `<span>Atomkärnor i bilden</span><span class="tal">${H.atomer.length}</span>`,
+    `<span>Delokaliserade valenselektroner</span><span class="tal">${H.el.length}</span>`,
+    `<span class="ord">Elektronerna har inte lämnat atomerna, de delas av alla atomerna i metallen. Metallen är som helhet neutral.</span>`,
+  ];
+  $('m5-hav-siffror').innerHTML = rader.join('');
+}
+
+// ---------------------------------------------------------------------
+// Böj metallen
+// ---------------------------------------------------------------------
+// Elektronhavet i snittet: hela bredden (snittet fortsätter åt sidorna) och
+// en halv grannavstånd ovanför och under atomerna.
+function m5BojdRam(d0) {
+  const L = Fysik.MET_KOL * d0, yK = (Fysik.MET_RAD - 1) / 2 * Math.sqrt(3) / 2 * d0 + 0.55 * d0;
+  return { x0: -L / 2, x1: L / 2, y0: -yK, y1: yK };
+}
+function m5BojdBygg() {
+  const B = M5.bojd, m = Fysik.METALLER[M5.metall];
+  B.atomer = Fysik.metallLagen(m.d0, B.block);
+  B.ram = m5BojdRam(m.d0);
+  B.el = Fysik.nyaElektroner(B.ram, B.atomer.length * m.val);
+}
+
+function m5BojdVisaFraga() {
+  const B = M5.bojd, behover = B.gissning === null;
+  $('m5-fraga').classList.toggle('aktiv', M5.del === 'bojd' && behover);
+  $('m5-forskjut').disabled = behover || B.lager === 'glider';
+  $('m5-slapp').disabled = behover || B.forskjut === 0 || B.lager !== 'stilla';
+}
+
+function m5BojdGissa(g) {
+  M5.bojd.gissning = g;
+  m5BojdVisaFraga();
+  m5Meddela('Bra. Skjut lagret med reglaget och släpp det sedan.');
+}
+
+function m5BojdForskjut(andel) {
+  const B = M5.bojd;
+  if (B.lager === 'glider') return;
+  B.lager = 'stilla';
+  B.forskjut = andel;
+  B.block.x = andel; B.block.y = Fysik.lagerHojd(andel); B.block.vx = B.block.vy = 0;
+  m5BojdVisaFraga();
+  const f = Fysik.lagerKraft(B.block), hel = Math.round(andel);
+  if (andel === 0) m5Meddela('Lagret ligger på plats. Varje atomkärna ligger i en grop mellan två atomkärnor i raden under.');
+  else if (Math.abs(andel - hel) < 0.04) m5Meddela(`Lagret har flyttats ${hel === 1 ? 'ett helt steg' : hel + ' hela steg'}. Varje atomkärna ligger åter i en grop, med grannar på samma avstånd som förut, och elektronhavet finns kvar mellan lagren. Släpp det och se.`, 'obs');
+  else if (f.fx < 0) m5Meddela('Atomkärnorna glider upp över atomkärnorna i raden under, och lagret lyfts lite. Nettokraften pekar tillbaka, mot gropen det kom ifrån. Släpp det och se.');
+  else m5Meddela('Lagret har passerat toppen: nettokraften pekar framåt, mot nästa grop. Släpp det och se.');
+}
+
+function m5BojdSlapp() {
+  const B = M5.bojd;
+  if (B.lager !== 'stilla' || B.forskjut === 0) return;
+  B.lager = 'glider';
+  B.tid = 0;
+  B.slapptVid = B.forskjut;
+  // En liten knuff, så att ett lager som släpps exakt på toppen också faller åt något håll.
+  B.block.vx = (Fysik.slump() - 0.5) * 0.04; B.block.vy = 0;
+  m5BojdVisaFraga();
+  m5Meddela('Lagret är släppt.');
+}
+
+function m5BojdNollstall() {
+  const B = M5.bojd;
+  B.block = { x: 0, y: 0, vx: 0, vy: 0 };
+  B.forskjut = 0; B.lager = 'stilla';
+  $('m5-forskjut').value = 0;
+  m5BojdBygg();
+  m5BojdVisaFraga();
+  m5Meddela('Metallen är som från början.');
+}
+
+function m5BojdUppdatera(sek) {
+  const B = M5.bojd, m = Fysik.METALLER[M5.metall];
+  if (B.lager === 'glider') {
+    const n = 10;
+    let f;
+    for (let i = 0; i < n; i++) f = Fysik.lagerSteg(B.block, sek / n);
+    B.tid += sek;
+    if (B.tid > 1 && Math.hypot(B.block.vx, B.block.vy) < 0.01 && f.belopp < 0.02 * M5_REF) {
+      const k = Math.round(B.block.x);
+      B.forskjut = Math.min(Math.max(B.block.x, 0), 2);
+      $('m5-forskjut').value = Math.round(B.forskjut * 100);
+      B.lager = 'stilla';
+      let text, typ = 'obs';
+      if (k === 0) text = 'Lagret gled tillbaka till sin gamla grop.';
+      else text = `Lagret stannade ${k === 1 ? 'ett steg' : k + ' steg'} från starten och sitter fast där. Metallen har bytt form utan att gå sönder: varje atomkärna har fått nya grannar, men alla atomkärnor är likadana och elektronhavet finns kvar överallt. Därför går en metall att böja och hamra.`;
+      if (B.slapptVid >= 0.9 && B.slapptVid <= 1.1) {
+        if (B.gissning === 'haller') text = 'Rätt gissat! ' + text;
+        if (B.gissning === 'spricker') text = 'Du gissade att den skulle spricka, men den höll. ' + text;
+        m5Klar('bojd', 'lager'); typ = 'bra';
+      }
+      const rest = B.slapptVid % 1;
+      if (rest >= 0.3 && rest <= 0.7) {
+        text += ' Lagret hamnar alltid i närmaste grop: före toppen glider det tillbaka, efter toppen går det vidare.';
+        if (m5Klar('bojd', 'halv')) typ = 'bra';
+      }
+      m5Meddela(text, typ);
+      m5BojdVisaFraga();
+    }
+  }
+  if (B.klara.has('lager') && M1.jon.klara.has('lager') && m5Klar('bojd', 'salt')) {
+    m5Meddela('Saltet sprack, men metallen höll. I saltet hamnade lika laddade joner mot varandra. I metallen är alla atomkärnor likadana och hålls ihop av elektronhavet, var lagret än ligger.', 'bra');
+  }
+  B.atomer = Fysik.metallLagen(m.d0, B.block);
+  for (let i = 0; i < M5_STEG; i++) Fysik.elektronSteg(B.el, sek / M5_STEG, { ram: B.ram, oppen: true });
+}
+
+function m5RitaBojd() {
+  const c = $('m5-bojd-bild');
+  if (!c.clientWidth) return;
+  const { ctx, w, h } = forberedDuk(c);
+  ctx.clearRect(0, 0, w, h);
+  const B = M5.bojd, m = Fysik.METALLER[M5.metall], d0 = m.d0;
+  const L = Fysik.MET_KOL * d0, radH = Math.sqrt(3) / 2 * d0;
+  const s = Math.min(w / L, (h - 60) / (B.ram.y1 - B.ram.y0));
+  const cx = w / 2, cy = h / 2 + 4;
+  // Snittet fortsätter åt sidorna: det som går ut till höger kommer in till vänster.
+  const kopior = B.atomer.flatMap(a => [a, { ...a, x: a.x - L }, { ...a, x: a.x + L }])
+    .filter(a => Math.abs(a.x * s) < w / 2 + m.rJon * s);
+  const X = x => cx + x * s, Y = y => cy + y * s;
+
+  ctx.save();
+  ctx.fillStyle = Tema.rgba('elektron', 0.10);
+  ctx.fillRect(0, Y(B.ram.y0), w, (B.ram.y1 - B.ram.y0) * s);
+  // Skarven mellan lagret och resten
+  const yOver = (Fysik.MET_BLOCK - 1 - (Fysik.MET_RAD - 1) / 2) * radH + B.block.y * d0;
+  const yUnder = (Fysik.MET_BLOCK - (Fysik.MET_RAD - 1) / 2) * radH;
+  ctx.strokeStyle = Tema.farg('text-dim'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, Y((yOver + yUnder) / 2)); ctx.lineTo(w, Y((yOver + yUnder) / 2)); ctx.stroke(); ctx.setLineDash([]);
+  m5RitaAtomer(ctx, kopior, m, s, X, Y);
+  // Märkta atomer: en i lagrets nedersta rad och en i raden under, i samma kolumn från början.
+  const mitt = Math.floor(Fysik.MET_KOL / 2);
+  ctx.strokeStyle = Tema.farg('stark'); ctx.lineWidth = 2.5;
+  for (const a of kopior) {
+    if (a.i !== mitt || (a.j !== Fysik.MET_BLOCK - 1 && a.j !== Fysik.MET_BLOCK)) continue;
+    ctx.beginPath(); ctx.arc(X(a.x), Y(a.y), m.rJon * s + 4, 0, 6.29); ctx.stroke();
+  }
+  // Elektronhavet fortsätter åt sidorna precis som atomkärnorna: rita kopior av
+  // elektronerna en snittbredd åt vänster och höger, så att de fyller hela bilden.
+  m5RitaElektroner(ctx, B.el.flatMap(e => [e, { x: e.x - L, y: e.y }, { x: e.x + L, y: e.y }])
+    .filter(e => Math.abs(e.x * s) < w / 2 + 4), X, Y);
+  // Kraften på lagret
+  if (B.forskjut > 0 || B.lager !== 'stilla' || B.block.x !== 0) {
+    const f = Fysik.lagerKraft(B.block);
+    const by = Y(((Fysik.MET_BLOCK - 1) / 2 - (Fysik.MET_RAD - 1) / 2) * radH + B.block.y * d0);
+    if (f.belopp < 0.03 * M5_REF) m1Noll(ctx, cx, by);
+    else {
+      const ln = Math.min(f.belopp / M5_REF, 2) * 45;
+      m1Pil(ctx, cx, by, cx + f.fx / f.belopp * ln, by + f.fy / f.belopp * ln, M5_FARG.netto, 5);
+      ctx.fillStyle = Tema.farg('text'); ctx.font = '12px system-ui'; ctx.textAlign = 'left';
+      ctx.fillText('kraft på lagret', cx + 12, by - 12);
+    }
+  }
+  ctx.restore();
+  ctx.fillStyle = Tema.farg('text'); ctx.font = '13px system-ui'; ctx.textAlign = 'right';
+  ctx.fillText(`förskjutning ${fmt(B.block.x, 2)} steg`, w - 12, 22);
+  ctx.fillStyle = Tema.farg('text-dim'); ctx.textAlign = 'left';
+  ctx.fillText(`Snitt genom ${m.namn}: lager av atomkärnor`, 12, h - 10);
+}
+
+function m5BojdSiffror() {
+  const B = M5.bojd, f = Fysik.lagerKraft(B.block);
+  const sida = f.belopp < 0.03 * M5_REF ? 'noll' : Math.abs(f.fx) < 0.03 * M5_REF ? 'ingen i sidled' : (f.fx < 0) === (B.block.x % 1 < 0.5) ? 'tillbaka mot gropen' : 'framåt mot nästa grop';
+  $('m5-bojd-siffror').innerHTML =
+    `<span>Förskjutning</span><span class="tal">${fmt(B.block.x, 2)} steg</span>` +
+    `<span>Kraft på lagret i sidled</span><span>${sida}</span>` +
+    `<span class="ord">Krafterna räknas med en förenklad modell där elektronhavets lim ingår i attraktionen mellan atomkärnorna. Bilden visar några lager ur en stor metallbit, som fortsätter åt sidorna.</span>`;
+}
+
+function m5Rita(tid) {
+  const sek = Math.min((tid - (M5.forraTid || tid)) / 1000, 0.05);
+  M5.forraTid = tid;
+  if (aktivVy === 'm5' && sek > 0) {
+    if (M5.del === 'hav') { m5HavUppdatera(sek); m5RitaHav(); m5HavSiffror(); }
+    else { m5BojdUppdatera(sek); m5RitaBojd(); m5BojdSiffror(); }
+  }
+  requestAnimationFrame(m5Rita);
+}
+
+function m5Init() {
+  document.querySelectorAll('#m5-delar button').forEach(b => b.addEventListener('click', () => m5SattDel(b.dataset.del)));
+  document.querySelectorAll('#m5-metaller button').forEach(b => b.addEventListener('click', () => m5ValjMetall(b.dataset.metall)));
+  $('m5-batteri').addEventListener('click', () => m5HavSattBatteri(!M5.hav.batteri));
+  $('m5-markera').addEventListener('change', e => { M5.hav.markera = e.target.checked; M5.hav.spar = []; M5.hav.markTid = 0; M5.hav.ute = null; });
+  $('m5-forskjut').addEventListener('input', e => m5BojdForskjut(Number(e.target.value) / 100));
+  $('m5-slapp').addEventListener('click', m5BojdSlapp);
+  $('m5-bojd-om').addEventListener('click', m5BojdNollstall);
+  $('m5-gissa-haller').addEventListener('click', () => m5BojdGissa('haller'));
+  $('m5-gissa-spricker').addEventListener('click', () => m5BojdGissa('spricker'));
+  m5ValjMetall('Na');
+  m5Meddela('De gula prickarna är valenselektronerna. Titta på hur de rör sig mellan atomkärnorna.');
+  requestAnimationFrame(m5Rita);
+}
+
+// =====================================================================
+// START
+// =====================================================================
+// Rubrikradens höjd (kan radbrytas) till CSS, så att modul 4 fyller resten av fönstret.
+function matRubrik() {
+  document.documentElement.style.setProperty('--rubrik-h', document.querySelector('header').offsetHeight + 'px');
+}
+
+// ---------------------------------------------------------------------
+// Tema: ljust eller mörkt
+// ---------------------------------------------------------------------
+// Startläget sätts av skriptet i <head>. Temaknappen sparar valet, och det
+// gäller då i alla kemiappar på webbplatsen (också i andra öppna flikar).
+// Utan sparat val följer appen datorns inställning, även om den ändras.
+// Färger som ritas med skript (svg-strängar och canvas) hämtas med
+// Tema.farg(namn), som läser CSS-variabeln --namn i det aktuella temat.
+const Tema = (() => {
+  const NYCKEL = 'kemiappar-tema';
+  const lyssnare = [];
+  let cache = {};
+  const sparat = () => { try { const t = localStorage.getItem(NYCKEL); return t === 'ljust' || t === 'morkt' ? t : null; } catch (e) { return null; } };
+  const system = () => matchMedia('(prefers-color-scheme: light)').matches ? 'ljust' : 'morkt';
+  // Utan DOM (testerna kör skriptet i node) gäller det mörka temat.
+  const rot = () => (typeof document !== 'undefined' && document.documentElement) || null;
+  const aktuellt = () => { const r = rot(); return r && r.dataset && r.dataset.tema === 'ljust' ? 'ljust' : 'morkt'; };
+  function satt(t) {
+    if (t === aktuellt()) return;
+    rot().dataset.tema = t;
+    cache = {};
+    for (const f of lyssnare) f(t);
+  }
+  function farg(namn) {
+    if (!(namn in cache)) {
+      const r = rot();
+      cache[namn] = r && typeof getComputedStyle === 'function' ? getComputedStyle(r).getPropertyValue('--' + namn).trim() : '';
+    }
+    return cache[namn];
+  }
+  // #rrggbb med genomskinlighet, för toningar och halvgenomskinliga ytor.
+  function rgba(namn, alfa) {
+    const h = farg(namn).replace('#', '');
+    const n = parseInt(h.length === 3 ? h.replace(/./g, c => c + c) : h, 16);
+    return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${alfa})`;
+  }
+  function init(vidByte) {
+    if (vidByte) lyssnare.push(vidByte);
+    const knapp = document.getElementById('tema-knapp');
+    const etikett = () => {
+      const text = aktuellt() === 'ljust' ? 'Byt till mörkt tema' : 'Byt till ljust tema';
+      knapp.setAttribute('aria-label', text);
+      knapp.title = text;
+    };
+    lyssnare.push(etikett);
+    etikett();
+    knapp.addEventListener('click', () => {
+      const t = aktuellt() === 'ljust' ? 'morkt' : 'ljust';
+      try { localStorage.setItem(NYCKEL, t); } catch (e) { /* privat läge: valet gäller bara den här sidan */ }
+      satt(t);
+    });
+    matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (!sparat()) satt(system()); });
+    window.addEventListener('storage', e => { if (e.key === NYCKEL) satt(sparat() || system()); });
+  }
+  return { init, farg, rgba, aktuellt };
+})();
+
+function init() {
+  Tema.init(() => { if (aktivVy === 'm3') m3Rita(); m4Rita(); m4RitaScen(1); });
+  matRubrik();
+  window.addEventListener('resize', matRubrik);
+  document.querySelectorAll('.flik').forEach(f => f.addEventListener('click', () => visaVy(f.dataset.vy)));
+  document.querySelectorAll('.kort').forEach(k => k.addEventListener('click', () => visaVy(k.dataset.ga)));
+  $('hjalp-knapp').addEventListener('click', () => $('hjalp').classList.add('oppen'));
+  $('hjalp-stang').addEventListener('click', () => $('hjalp').classList.remove('oppen'));
+  $('hjalp').addEventListener('click', e => { if (e.target === $('hjalp')) $('hjalp').classList.remove('oppen'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') $('hjalp').classList.remove('oppen'); });
+
+  // Modul 1
+  m1Init();
+  // Modul 2
+  const c1 = $('m2-atomer');
+  c1.addEventListener('pointerdown', m2Ned);
+  c1.addEventListener('pointermove', m2Flytt);
+  c1.addEventListener('pointerup', m2Upp);
+  c1.addEventListener('pointercancel', m2Upp);
+  c1.addEventListener('keydown', e => {
+    if (M2.lage === 'hand' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) M2.tangentAktiv = true;
+    m2Tangent(e);
+  });
+  c1.addEventListener('blur', () => { M2.tangentAktiv = false; });
+  document.querySelectorAll('#m2-amnen button').forEach(b => b.addEventListener('click', () => m2ValjAmne(b.dataset.amne)));
+  $('m2-lage-hand').addEventListener('click', () => m2SattLage('hand'));
+  $('m2-lage-fri').addEventListener('click', () => m2SattLage('fri'));
+  $('m2-omg-av').addEventListener('click', () => m2SattOmgivning(false));
+  $('m2-omg-pa').addEventListener('click', () => m2SattOmgivning(true));
+  $('m2-borja-om').addEventListener('click', m2Nollstall);
+  $('m2-gissa-fast').addEventListener('click', () => m2Gissa('fast'));
+  $('m2-gissa-studs').addEventListener('click', () => m2Gissa('studs'));
+  requestAnimationFrame(m2Rita);
+
+  // Modul 3
+  m3ByggForval();
+  $('m3-reglage').addEventListener('input', e => m3Satt(parseFloat(e.target.value)));
+  $('m3-granser').addEventListener('change', e => $('m3-kontinuum').classList.toggle('visa-granser', e.target.checked));
+  window.addEventListener('resize', () => { if (aktivVy === 'm3') m3Rita(); });
+
+  // Modul 4
+  m4ByggHylla();
+  const svg = $('m4-svg');
+  svg.setAttribute('tabindex', '0');
+  svg.addEventListener('click', m4Klick);
+  svg.addEventListener('keydown', m4Tangent);
+  $('m4-las').addEventListener('click', m4Genomfor);
+  $('m4-borja-om').addEventListener('click', m4Nollstall);
+  m4Rita();
+  $('m4-scen-text').textContent = Fysik.BH_TEXT.start;
+  m4RitaScen(1);
+
+  // Modul 5
+  m5Init();
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+}
+</script>
+</body>
+</html>

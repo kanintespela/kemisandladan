@@ -1,10 +1,18 @@
-# Kemisandlådan
+# Kemiappar
 
-En interaktiv partikelsimulator för gymnasiets kemiundervisning – kör direkt i webbläsaren, ingen installation krävs.
+Interaktiva kemiappar för gymnasiet – kör direkt i webbläsaren, ingen installation krävs.
 
-**[Öppna Kemisandlådan ➜](https://kanintespela.github.io/kemisandladan/)**
+**[Öppna samlingssidan ➜](https://kanintespela.github.io/kemisandladan/)**
 
-## Vad är det?
+| App | Adress | Status |
+|---|---|---|
+| Kemisandlådan | [/sandladan/](https://kanintespela.github.io/kemisandladan/sandladan/) | beta 0.5 |
+| Bindningsverkstan | [/bindningsverkstan/](https://kanintespela.github.io/kemisandladan/bindningsverkstan/) | 0.13 |
+| Kemiska reaktioner och energi | [/reaktioner/](https://kanintespela.github.io/kemisandladan/reaktioner/) | prototyp 0.3 |
+
+Kemisandlådan låg tidigare direkt på [kanintespela.github.io/kemisandladan/](https://kanintespela.github.io/kemisandladan/). Där finns nu samlingssidan, med en länk till sandlådan.
+
+## Kemisandlådan
 
 Kemisandlådan visualiserar atomer och molekyler i realtid: eleven placerar ut atomer och ser vad som händer. Bindningar bildas och bryts, vatten kondenserar och fryser till ett hexagonalt isgitter, syror protolyserar, salter löser sig och kristalliserar. Temperatur och volym kan justeras medan manometer, koncentration och pH följs löpande.
 
@@ -12,15 +20,35 @@ Utöver den fria sandlådan finns sexton guidade uppdrag – stökiometri och be
 
 Tanken är att fylla glappet mellan den symboliska nivån (formler och reaktioner på tavlan) och den submikroskopiska (vad partiklarna faktiskt gör).
 
-## Status: betaversion
+## Bindningsverkstan
 
-Detta är ett pågående bygge, inte en färdig produkt. Det fungerar bra på en vanlig dator men blir segt med många partiklar i rummet, och är ännu inte anpassat för surfplattor eller mindre skärmar. Modellen är medvetet förenklad – till exempel visas temperatur på en relativ skala eftersom fenomenen inte går att kalibrera mot riktiga kelvin samtidigt. Där modellen har en gräns försöker appen skriva ut den för eleven i stället för att dölja den.
+Fem moduler om varför atomer håller ihop: attraktion och repulsion i en molekyl och i ett jongitter, potentialkurvan när två atomer dras ihop, elektronegativitet som ett kontinuum, energitrappan från natrium och klor till natriumklorid, och metallbindning (elektronhavet, ström, böj metallen).
+
+## Kemiska reaktioner och energi
+
+Eleven förutsäger om en reaktion tar upp eller avger energi och går sedan energitrappan via fria atomer, steg för steg, med en partikelbild för varje steg. Tio reaktioner, från is som smälter till fotosyntesen.
+
+## Ljust och mörkt tema
+
+Alla appar och samlingssidan har ett ljust och ett mörkt tema. Utan eget val följer de datorns inställning. Temaknappen uppe till höger byter, och valet sparas i webbläsaren och gäller då i alla apparna.
+
+## Status
+
+Apparna är pågående byggen, inte färdiga produkter. De fungerar bra på en vanlig dator men är ännu inte anpassade för surfplattor eller mindre skärmar. Modellerna är medvetet förenklade – till exempel visas temperaturen i Kemisandlådan på en relativ skala eftersom fenomenen inte går att kalibrera mot riktiga kelvin samtidigt. Där en modell har en gräns försöker appen skriva ut den för eleven i stället för att dölja den.
 
 Feedback och synpunkter tas gärna emot – öppna gärna ett [issue här på GitHub](https://github.com/kanintespela/kemisandladan/issues).
 
 ## Teknik
 
-Kemisandlådan är en enda fristående HTML-fil utan externa beroenden, byggberoenden eller installation. Den öppnas direkt i webbläsaren och fungerar även offline. Ingen inloggning, inget konto och ingen spårning.
+Varje app är en enda fristående HTML-fil utan externa beroenden, byggberoenden eller installation. Den öppnas direkt i webbläsaren och fungerar även offline. Ingen inloggning, inget konto och ingen spårning.
+
+```
+index.html                    samlingssidan
+bilder/                       skärmbilderna på samlingssidan, ljust och mörkt tema
+sandladan/index.html          Kemisandlådan
+bindningsverkstan/index.html  Bindningsverkstan
+reaktioner/index.html         Kemiska reaktioner och energi
+```
 
 ## Licens
 
