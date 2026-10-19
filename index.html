@@ -1324,19 +1324,34 @@ const HB_DONOR_ANG = Math.PI / 3; // 60°. De två donatorarmarna ligger i φ ±
                                   // ~8° från donatorarmarna, så väteatomerna hamnar ändå tydligt längs
                                   // bindningarna (inom isregel-kanalen). Att i stället lägga armarna EXAKT på
                                   // 52° bröt 120°-symmetrin och gav tätpackning (koordination ~4.8, mätt).
-const HB_R0 = 50;                // Jämviktsavstånd (px) mellan vätebundna grannars masscentrum. MEDVETET
+const HB_R0 = 78;                // Jämviktsavstånd (px) mellan vätebundna grannars masscentrum. MEDVETET
                                   // stort - vattenmolekylens fotavtryck är ~38 px (O-centrum till väte-spets),
                                   // så gitterkonstanten måste överstiga det TYDLIGT för att sexkantiga HÅL ska
                                   // synas mellan molekylerna (v10.0-v10.1 hade R0=40: matematisk ordning men
                                   // väteatomerna fyllde luckorna, inga synliga hexringar - användarrapport).
-                                  // Vid 50 px sitter syreatomerna (röda) på ett öppet hexagonalt gitter med
-                                  // tomma ringcentrum, precis som verklig is (v10.2).
-const HB_SIGMA_R = 11;           // Radiell brunnbredd (px) - hur långt utanför R0 bindningen känns (v10.2: 8->11
+                                  // v10.76 (Christian godkände omkalibreringen): 50 -> 78. Vid 50 px blev
+                                  // H···O ~22 px, KORTARE än den egna O-H-bindningen (27 px) - vätet satt mitt
+                                  // emellan två syren och isen såg ut som ett kovalent nätverk. Verklig is:
+                                  // O-H 0,96 Å, H···O ~1,8 Å, O···O 2,76 Å, alltså H···O ≈ 1,9 × O-H och
+                                  // O···O ≈ 2,9 × O-H. Med O-H = 27 px ger det O···O ≈ 78 px. Uppmätt efter
+                                  // ändringen (fysikrigg, protokoll A/B/C, 4 frön): O···O 68-76, H···O 50-55
+                                  // px (1,9-2,0 × O-H). SIGMA_R och RANGE skalas med R0 (samma proportioner
+                                  // som vid 50), övriga HB-konstanter är oförändrade.
+const HB_SIGMA_R = 0.22 * HB_R0; // Radiell brunnbredd (px) - hur långt utanför R0 bindningen känns (v10.2: 8->11; v10.76: 11/50 av R0
                                   // eftersom R0 höjdes; bredare brunn fångar in molekyler från vätskeavståndet)
-const HB_SIGMA_A = 0.35;         // Vinkelskärpa (rad, ~20°) - hur exakt armarna måste peka mot varandra
-const HB_EPS = 340;              // Brunndjup (attraktiv kraftskala, r >= R0). Kalibrerad via sweep_hbond3:
-                                  // koordination 2.78 (~3 = honeycomb), psi3 0.90 vid EPS340/DAMP0.05/CORE0.6
-const HB_RANGE = 66;             // Bortom detta (px) beräknas termen inte alls (v10.2: 55->66, följer R0-höjningen)
+const HB_SIGMA_A = 0.45;         // Vinkelskärpa (rad, ~26°) - hur exakt armarna måste peka mot varandra.
+                                  // v10.76: 0,35 -> 0,45 när R0 höjdes till 78. Den täta vätskan (O···O ~45)
+                                  // måste nu expandera längre innan gittret sluter sig, och med skarpare armar
+                                  // frös 13 molekyler oftare som öppna kedjor (för få ringar för att klassas
+                                  // som is). Svep, Fasövergångar-protokollet, 12 frön: 0,35 -> 9/12 is,
+                                  // 0,45 -> 12/12, minst 31 % molekyler med 3 gittergrannar i varje körning.
+const HB_EPS = 450;              // Brunndjup (attraktiv kraftskala, r >= R0). Kalibrerad via sweep_hbond3:
+                                  // koordination 2.78 (~3 = honeycomb), psi3 0.90 vid EPS340/DAMP0.05/CORE0.6.
+                                  // v10.76: 340 -> 450 när R0 höjdes till 78 (tillsammans med HB_SIGMA_A,
+                                  // se där) - snabbare och säkrare frysning av det glesare gittret.
+                                  // Smältpunkten påverkas inte - den styrs av den skarpa avstängningen
+                                  // vid HB_T_OFF.
+const HB_RANGE = HB_R0 + 1.45 * HB_SIGMA_R; // Bortom detta (px) beräknas termen inte alls (v10.2: 55->66; v10.76: samma 66/50-proportion mot R0)
 const HB_T_FULL = 273;           // Full styrka under denna temperatur ("fryspunkt", på appens skala)
 const HB_T_OFF = 283;            // Noll styrka över denna - SKARP smältning (se resonemanget ovan)
 const HB_FORCE_CAP = 3.0;        // Tak per parkraft (samma anda som MOL_DIPOLE_CAP/FORCE_CAP)
@@ -1349,7 +1364,11 @@ const HB_TORQUE_CAP = 40;        // Tak per par-vridmoment (inertia för H2O är
 // närmare än R0, oavsett orientering, så syregittret hålls öppet. Vätskan
 // (HB av) har ingen kärna och packas därför tätare -> is flyter, som på riktigt.
 const HB_CORE_K = 0.6;           // Styvhet på den repulsiva kärnan (kraft = K*(R0-r), kapad). Kalibrerad (sweep_hbond3)
-const HB_CORE_CAP = 5.0;         // Tak på kärnkraften (Δv-taket per delsteg dämpar ändå, men undvik spikar)
+const HB_CORE_CAP = 20.0;        // Tak på kärnkraften (Δv-taket per delsteg dämpar ändå, men undvik spikar).
+                                  // v10.76: 5 -> 20. Vätskan har par vars syren överlappar (O···O < 28 px,
+                                  // även före v10.76), och med taket 5 frös de in som "dubbla" gitterplatser:
+                                  // 6-9 sådana par i is ur en tät klunga på 24 molekyler. Med 20: 0 i 8/8
+                                  // körningar, psi3 0,75 -> 0,91, och Fasövergångar fryser fortfarande 10/10.
 // v10.2: dämpa den ORIKTADE atom-atom-attraktionen (LJ + H...O-Coulomb) MELLAN
 // två frusna vattenmolekyler. NYCKELN till en HONEYCOMB (3 grannar, öppna
 // hexringar) i stället för en tätpackad triangulär is (6 grannar): en oriktad
@@ -4702,6 +4721,8 @@ function isHydrogenBondPair(a, b) {
 // ritade linjerna i en vätska 14-85 px långa).
 const IMF_DRAW_RANGE = 1.35;        // × radiesumman. Bundna H···O i vätska/is: 16-31 px (radiesumma 27)
 const HBOND_DRAW_MIN_ANGLE = 120;   // grader, vinkeln D-H···A vid vätet (180 = rak)
+// v10.76: H···O i is när O-H···O är rak = gitteravståndet minus O-H-bindningen.
+const HB_ICE_HO = HB_R0 - (ELEMENT_DEFS.O.radius + ELEMENT_DEFS.H.radius);
 // Vinkeln D-H···A (grader) vid vätet h, där D är atomen h är kovalent bundet
 // till i sin molekyl. 0 om h saknar bindning (fri proton - ingen vätebindning).
 function hbondDrawAngle(h, hMol, acceptor) {
@@ -9140,6 +9161,12 @@ function createFromOrganicBuilder() {
 // som redan mäts av dessa test. Gäller bara VATTEN (Li:s motsvarande etikett
 // är fortfarande EJ PÅBÖRJAD, se ROADMAP).
 const WATER_NEIGHBOR_RANGE = 1.30 * HB_R0;
+// v10.76: grannskalet för VÄTSKA/GAS hålls kvar på det gamla värdet (1,30 × 50).
+// Det följde tidigare med HB_R0 - med R0 = 78 hade skalet blivit 101 px, och
+// utspridd ånga i ett fullt rum hade kunnat räknas som ett sammanhängande
+// kluster. Gitterskalet (WATER_NEIGHBOR_RANGE) används bara medan vätebindnings-
+// nätet är på eller isen ännu inte släppt sin klassning (se computeWaterAggregation).
+const WATER_LIQUID_NEIGHBOR_RANGE = 65;
 const WATER_ORDER_THRESHOLD = 0.55;
 const WATER_BOUND_THRESHOLD = 0.5;
 // v10.5: två extra ROBUSTHETSkrav (användarrapport: v10.4-etiketten visade FAST
@@ -9198,12 +9225,16 @@ function computeWaterAggregation() {
   const w = molecules.filter(m => getMoleculeFormulaPlain(m) === 'H2O');
   const nTot = w.length;
   if (nTot === 0) { _lastWaterAggState = null; _waterEMA = null; return { present: false, state: null, psi3: 0, boundFraction: 0 }; }
+  // v10.76: gitterskalet medan isen kan finnas (nätet på, eller klassningen
+  // fortfarande 'fast' under smältningen - annars hade ett is-gitter på 78 px
+  // sett sönderfallet ut i samma ögonblick som det värmdes), annars vätskeskalet.
+  const range = (waterHBondStrength() > 0 || _lastWaterAggState === 'fast') ? WATER_NEIGHBOR_RANGE : WATER_LIQUID_NEIGHBOR_RANGE;
   let boundCount = 0, psiSum = 0, psiCount = 0;
   for (const m of w) {
     let cnt = 0, re = 0, im = 0;
     for (const n of w) {
       if (n === m) continue;
-      if (Math.hypot(n.cx - m.cx, n.cy - m.cy) < WATER_NEIGHBOR_RANGE) {
+      if (Math.hypot(n.cx - m.cx, n.cy - m.cy) < range) {
         cnt++;
         const th = Math.atan2(n.cy - m.cy, n.cx - m.cx);
         re += Math.cos(3 * th); im += Math.sin(3 * th);
@@ -9217,7 +9248,7 @@ function computeWaterAggregation() {
   const rawCoord = psiCount / nTot;
   // Största sammanhängande klustret (findClusters finns sedan v9.9): skiljer EN
   // samlad kropp (vätska/is) från utspridda småbitar (gas).
-  const clusters = findClusters(w, WATER_NEIGHBOR_RANGE, m => [m.cx, m.cy]);
+  const clusters = findClusters(w, range, m => [m.cx, m.cy]);
   let largest = 0;
   for (const c of clusters) if (c.length > largest) largest = c.length;
   const rawLargest = largest / nTot;
@@ -11316,14 +11347,18 @@ function draw() {
               // δ+-atom och bara den närmaste ritas (efter loopen).
               let hbondPair = isHydrogenBondPair(a, b);
               let r = Math.hypot(b.x - a.x, b.y - a.y);
-              if (r >= (a.radius + b.radius) * IMF_DRAW_RANGE) continue;
+              // v10.76: i is ligger H···O på gitteravståndet (HB_ICE_HO), inte på
+              // kontaktavståndet - därför en egen gräns för frusna vattenpar.
+              const lim = (hbondPair && molA._frozenWater && molB._frozenWater)
+                ? HB_ICE_HO * IMF_DRAW_RANGE : (a.radius + b.radius) * IMF_DRAW_RANGE;
+              if (r >= lim) continue;
               const pos = qA > 0 ? a : b, neg = qA > 0 ? b : a;
               if (hbondPair && hbondDrawAngle(pos, qA > 0 ? molA : molB, neg) < HBOND_DRAW_MIN_ANGLE) continue;
               // ...och kort även I BILD: 3D-tippningen vrider molekylerna bara
               // visuellt (fysiken är plan), så ett fysiskt bundet par kan
               // visas långt isär - linjen blev då 50-85 px trots 25 px i fysiken.
               const da = dispMap.get(a.id), db = dispMap.get(b.id);
-              if (Math.hypot(db.x - da.x, db.y - da.y) >= (a.radius + b.radius) * IMF_DRAW_RANGE) continue;
+              if (Math.hypot(db.x - da.x, db.y - da.y) >= lim) continue;
               const prev = imfBest.get(pos.id);
               if (!prev || r < prev.r) imfBest.set(pos.id, { a: pos, b: neg, r, hb: hbondPair });
             }
