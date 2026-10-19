@@ -4684,6 +4684,35 @@ function isHydrogenBondPair(a, b) {
   return hbondDonorAcceptor(a, b) || hbondDonorAcceptor(b, a);
 }
 
+// v10.75: URVALET för de streckade linjerna i lagret Intermolekylära
+// bindningar (bara ritningen - krafterna är oförändrade). Tidigare ritades en
+// linje för VARJE motsatt laddat atompar inom 2,8 (vätebindning) resp. 2,3
+// (dipol-dipol) gånger radiesumman, utan krav på riktning. Uppmätt i en
+// vattenklunga (40 H2O): 88-97 % av väteatomerna fick 3+ linjer samtidigt, och
+// 66-73 % av de ritade "vätebindningarna" hade en O-H···O-vinkel under 120° -
+// vätet pekade alltså inte mot syret. Linjernas längd varierade 14-75 px vid
+// alla temperaturer (medel ~55 px, dubbla den kovalenta O-H-bindningen),
+// medan de verkligt bundna paren ligger på 16-31 px. HCl: i snitt 9 linjer
+// per molekyl vid rumstemperatur.
+// Nu: högst EN linje per δ+-atom (den närmaste giltiga partnern), bara vid
+// kontaktavstånd, och för vätebindningar bara när D-H···A-vinkeln är minst
+// 120° (vanligt geometriskt kriterium; IUPAC 2011 rekommenderar > 110°).
+// Avståndet krävs både i fysiken och i bild (3D-tippningen är bara visuell
+// och tumlar fritt, snabbare ju varmare det är - utan bildkravet blev de
+// ritade linjerna i en vätska 14-85 px långa).
+const IMF_DRAW_RANGE = 1.35;        // × radiesumman. Bundna H···O i vätska/is: 16-31 px (radiesumma 27)
+const HBOND_DRAW_MIN_ANGLE = 120;   // grader, vinkeln D-H···A vid vätet (180 = rak)
+// Vinkeln D-H···A (grader) vid vätet h, där D är atomen h är kovalent bundet
+// till i sin molekyl. 0 om h saknar bindning (fri proton - ingen vätebindning).
+function hbondDrawAngle(h, hMol, acceptor) {
+  const bd = hMol.bonds.find(x => x.a === h || x.b === h);
+  if (!bd) return 0;
+  const d = bd.a === h ? bd.b : bd.a;
+  const ux = d.x - h.x, uy = d.y - h.y, vx = acceptor.x - h.x, vy = acceptor.y - h.y;
+  const den = Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1;
+  return Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy) / den))) * 180 / Math.PI;
+}
+
 // --- v8.2.1: Termisk dissociation baserad på VERKLIGA bindningsentalpier ---
 // Tidigare användes den interna estimateBondEnergy-skalan, som överskattar
 // hur svaga enkelbindningar är relativt dubbel-/trippelbindningar (H2O
@@ -11246,6 +11275,9 @@ function draw() {
   if (showIntermolecular) {
   ctx.lineWidth = 1.7;
   ctx.setLineDash([4, 4]);
+  // v10.75: närmaste giltiga partner per δ+-atom (se IMF_DRAW_RANGE) - fylls
+  // i parloopen nedan och ritas efter den.
+  const imfBest = new Map();
   for (let i = 0; i < molecules.length; i++) {
     for (let j = i + 1; j < molecules.length; j++) {
       let molA = molecules[i]; let molB = molecules[j];
@@ -11279,14 +11311,21 @@ function draw() {
             // enskild atoms laddning är gott och väl över 0.05 i magnitud.
             // Kontrollera istället varje atoms egen laddning plus motsatt tecken.
             if (Math.abs(qA) > 0.03 && Math.abs(qB) > 0.03 && qA * qB < 0) {
+              // v10.75: en linje ritas bara för en faktisk KONTAKT - se
+              // IMF_DRAW_RANGE och HBOND_DRAW_MIN_ANGLE. Kandidaten sparas per
+              // δ+-atom och bara den närmaste ritas (efter loopen).
               let hbondPair = isHydrogenBondPair(a, b);
               let r = Math.hypot(b.x - a.x, b.y - a.y);
-              let visRange = (a.radius + b.radius) * (hbondPair ? 2.8 : 2.3);
-              if (r < visRange) {
-                const pa = dispMap.get(a.id), pb = dispMap.get(b.id);
-                ctx.strokeStyle = hbondPair ? HBOND_COLOR : DIPOLE_COLOR;
-                ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-              }
+              if (r >= (a.radius + b.radius) * IMF_DRAW_RANGE) continue;
+              const pos = qA > 0 ? a : b, neg = qA > 0 ? b : a;
+              if (hbondPair && hbondDrawAngle(pos, qA > 0 ? molA : molB, neg) < HBOND_DRAW_MIN_ANGLE) continue;
+              // ...och kort även I BILD: 3D-tippningen vrider molekylerna bara
+              // visuellt (fysiken är plan), så ett fysiskt bundet par kan
+              // visas långt isär - linjen blev då 50-85 px trots 25 px i fysiken.
+              const da = dispMap.get(a.id), db = dispMap.get(b.id);
+              if (Math.hypot(db.x - da.x, db.y - da.y) >= (a.radius + b.radius) * IMF_DRAW_RANGE) continue;
+              const prev = imfBest.get(pos.id);
+              if (!prev || r < prev.r) imfBest.set(pos.id, { a: pos, b: neg, r, hb: hbondPair });
             }
           }
         }
@@ -11342,6 +11381,13 @@ function draw() {
         }
       }
     }
+  }
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1.7;
+  for (const c of imfBest.values()) {
+    const pa = dispMap.get(c.a.id), pb = dispMap.get(c.b.id);
+    ctx.strokeStyle = c.hb ? HBOND_COLOR : DIPOLE_COLOR;
+    ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
   }
   ctx.setLineDash([]);
   } // slut if (showIntermolecular)
