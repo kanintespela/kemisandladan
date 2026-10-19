@@ -5,6 +5,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kemisandlådan 0.5 beta</title>
+<script id="tema-start">
+  // Tema före första ritningen, så att sidan inte blinkar till i fel tema.
+  // Ett sparat val (temaknappen) gäller i alla kemiappar på webbplatsen;
+  // utan sparat val följer appen datorns inställning.
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('kemiappar-tema'); } catch (e) {}
+    if (t !== 'ljust' && t !== 'morkt') t = matchMedia('(prefers-color-scheme: light)').matches ? 'ljust' : 'morkt';
+    document.documentElement.dataset.tema = t;
+  })();
+</script>
 <style>
   :root {
     --bg:        #080c10;
@@ -18,6 +29,25 @@
     --text-dim:  #5a7a8a;
     --font-mono: 'Courier New', monospace;
     --font-ui:   system-ui, sans-serif;
+    --skymning:  rgba(0, 0, 0, 0.65);
+    --skugga:    rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+  /* Ljust tema: samma roller, mörkare accenter så att de syns mot vitt.
+     Färgerna som ritas i rummet byts i skriptet (LJUS_HEX, LJUS_RGB). */
+  :root[data-tema="ljust"] {
+    --bg:        #eef2f6;
+    --bg2:       #ffffff;
+    --bg3:       #e6edf3;
+    --border:    #bccbd7;
+    --accent:    #0072a3;
+    --accent2:   #00805a;
+    --danger:    #c62828;
+    --text:      #18252f;
+    --text-dim:  #52687a;
+    --skymning:  rgba(20, 35, 50, 0.4);
+    --skugga:    rgba(20, 35, 50, 0.25);
+    color-scheme: light;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -269,8 +299,8 @@
   /* v10.15: klickbara artrader i "Analys Föreningar" - klick lyser upp alla
      molekyler av det slaget i simuleringen (se toggleSpeciesHighlight). */
   .species-row { cursor: pointer; padding: 1px 3px; border-radius: 2px; }
-  .species-row:hover { background: rgba(0, 212, 255, 0.12); }
-  .species-row.selected { background: rgba(0, 212, 255, 0.2); outline: 1px solid var(--accent); }
+  .species-row:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .species-row.selected { background: color-mix(in srgb, var(--accent) 20%, transparent); outline: 1px solid var(--accent); }
   .info-text {
     font-size: 11px;
     line-height: 1.4;
@@ -282,7 +312,7 @@
   /* Hjälp-dialog (v8.5.1) */
   .modal-backdrop {
     position: fixed; inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background: var(--skymning);
     display: none;
     align-items: center; justify-content: center;
     z-index: 100;
@@ -294,7 +324,7 @@
     background: var(--bg2);
     border: 1px solid var(--border);
     display: flex; flex-direction: column;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    box-shadow: 0 10px 40px var(--skugga);
   }
   .modal-tabs {
     display: flex; align-items: center;
@@ -352,11 +382,11 @@
   #scenario-panel {
     position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
     width: min(540px, 82%);
-    background: rgba(13, 21, 32, 0.95);
+    background: color-mix(in srgb, var(--bg2) 95%, transparent);
     border: 1px solid var(--accent);
     padding: 12px 14px; z-index: 20;
     font-size: 12.5px; line-height: 1.45;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 6px 24px var(--skugga);
   }
   #scenario-progress {
     font-family: var(--font-mono); font-size: 10px;
@@ -425,11 +455,30 @@
        över de 24×24 px LEVERANSGRANSKNING.md F9 satte som klickbar minsta. */
     .periodic-mini { max-width: 264px; }
   }
+  /* ---------- Tema och länken till alla appar ---------- */
+  .hem-lank {
+    color: var(--text-dim); text-decoration: none; font-size: 13px; white-space: nowrap;
+    padding: 6px 9px; border: 1px solid var(--border); border-radius: 6px;
+  }
+  .hem-lank:hover { color: var(--text); border-color: var(--accent); }
+  .tema-knapp {
+    background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+    width: 38px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; flex: none;
+  }
+  .tema-knapp:hover { border-color: var(--accent); }
+  .tema-knapp svg { width: 18px; height: 18px; }
+  :root[data-tema="ljust"] .tema-knapp .ikon-sol, :root:not([data-tema="ljust"]) .tema-knapp .ikon-mane { display: none; }
+  /* Rubrikraden är redan full: kompakt länk och knapp i sandlådans knappstil. */
+  .hem-lank { font-family: var(--font-mono); font-size: 14px; line-height: 1; padding: 5px 8px; border-radius: 0; }
+  .tema-knapp { width: 30px; height: 27px; border-radius: 0; background: transparent; }
+  .tema-knapp svg { width: 15px; height: 15px; }
 </style>
 </head>
 <body>
 
 <header>
+  <a class="hem-lank" href="../" title="Alla kemiappar" aria-label="Alla kemiappar">←</a>
   <h1>⬡ Kemisandlådan <span class="beta-tag">0.5 BETA</span></h1>
   <div class="controls">
     <span>TEMPERATUR:</span>
@@ -460,6 +509,10 @@
   <button class="btn" onclick="openStartScreen()">UPPDRAG</button>
   <button class="btn" style="border-color: var(--accent2); color: var(--accent2);" onclick="openHelp()">? HJÄLP</button>
   <button class="btn" id="spawn-mix-btn" onclick="spawnPolarMix()">SPAWNA MIX</button>
+  <button class="tema-knapp" id="tema-knapp" type="button" aria-label="Byt tema" title="Byt tema">
+    <svg class="ikon-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="ikon-mane" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z" fill="currentColor"/></svg>
+  </button>
 </header>
 
 <div class="workspace">
@@ -782,6 +835,87 @@
 </div>
 
 <script>
+// ---------------------------------------------------------------------
+// Tema: ljust eller mörkt
+// ---------------------------------------------------------------------
+// Startläget sätts av skriptet i <head>. Temaknappen sparar valet, och det
+// gäller då i alla kemiappar på webbplatsen (också i andra öppna flikar).
+// Utan sparat val följer appen datorns inställning, även om den ändras.
+// Färger som ritas med skript (svg-strängar och canvas) hämtas med
+// Tema.farg(namn), som läser CSS-variabeln --namn i det aktuella temat.
+const Tema = (() => {
+  const NYCKEL = 'kemiappar-tema';
+  const lyssnare = [];
+  let cache = {};
+  const sparat = () => { try { const t = localStorage.getItem(NYCKEL); return t === 'ljust' || t === 'morkt' ? t : null; } catch (e) { return null; } };
+  const system = () => matchMedia('(prefers-color-scheme: light)').matches ? 'ljust' : 'morkt';
+  // Utan DOM (testerna kör skriptet i node) gäller det mörka temat.
+  const rot = () => (typeof document !== 'undefined' && document.documentElement) || null;
+  const aktuellt = () => { const r = rot(); return r && r.dataset && r.dataset.tema === 'ljust' ? 'ljust' : 'morkt'; };
+  function satt(t) {
+    if (t === aktuellt()) return;
+    rot().dataset.tema = t;
+    cache = {};
+    for (const f of lyssnare) f(t);
+  }
+  function farg(namn) {
+    if (!(namn in cache)) {
+      const r = rot();
+      cache[namn] = r && typeof getComputedStyle === 'function' ? getComputedStyle(r).getPropertyValue('--' + namn).trim() : '';
+    }
+    return cache[namn];
+  }
+  // #rrggbb med genomskinlighet, för toningar och halvgenomskinliga ytor.
+  function rgba(namn, alfa) {
+    const h = farg(namn).replace('#', '');
+    const n = parseInt(h.length === 3 ? h.replace(/./g, c => c + c) : h, 16);
+    return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${alfa})`;
+  }
+  function init(vidByte) {
+    if (vidByte) lyssnare.push(vidByte);
+    const knapp = document.getElementById('tema-knapp');
+    const etikett = () => {
+      const text = aktuellt() === 'ljust' ? 'Byt till mörkt tema' : 'Byt till ljust tema';
+      knapp.setAttribute('aria-label', text);
+      knapp.title = text;
+    };
+    lyssnare.push(etikett);
+    etikett();
+    knapp.addEventListener('click', () => {
+      const t = aktuellt() === 'ljust' ? 'morkt' : 'ljust';
+      try { localStorage.setItem(NYCKEL, t); } catch (e) { /* privat läge: valet gäller bara den här sidan */ }
+      satt(t);
+    });
+    matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (!sparat()) satt(system()); });
+    window.addEventListener('storage', e => { if (e.key === NYCKEL) satt(sparat() || system()); });
+  }
+  return { init, farg, rgba, aktuellt };
+})();
+
+// Ritkoden använder det mörka temats färger. I det ljusa temat byts de mot en
+// motsvarighet som syns mot ljus bakgrund: tf() för #rrggbb, tfa() för
+// "r, g, b" med genomskinlighet. Färger som saknas i tabellerna (grundämnenas,
+// laddningsbrickornas, laddningskartans) är desamma i båda temana, och i det
+// mörka temat ritas allt exakt som förut.
+const LJUS_HEX = {
+  '#00d4ff': '#0072a3', '#00ff9d': '#00805a', '#e8edf2': '#18252f',
+  '#ffd400': '#b38f00',   // vätebindning, fortfarande gul
+  '#00e5cc': '#00998a',   // dipol-dipol, fortfarande turkos
+  '#ff6ec7': '#cc2f8f',   // jonbindning, fortfarande rosa
+  '#b28dff': '#7a4fd6',   // jon-dipol, fortfarande violett
+  '#ffb020': '#b86e00', '#7dd3fc': '#0284c7', '#5cb3ff': '#1f6fd1',
+};
+const LJUS_RGB = {
+  '0, 212, 255': '0, 114, 163', '200, 220, 232': '24, 37, 47', '30, 58, 82': '188, 203, 215',
+  '8, 12, 16': '255, 255, 255', '154, 180, 200': '82, 104, 122', '90, 122, 138': '82, 104, 122',
+  '0, 255, 157': '0, 128, 90', '200, 255, 230': '0, 128, 90', '190,208,224': '70, 90, 110',
+  '255, 176, 32': '184, 110, 0', '255, 221, 87': '230, 170, 0', '235, 230, 255': '70, 50, 160',
+  '255, 200, 60': '200, 140, 0', '120, 220, 120': '30, 150, 60',
+};
+let ljustTema = Tema.aktuellt() === 'ljust';
+function tf(c) { return ljustTema ? (LJUS_HEX[c] || c) : c; }
+function tfa(rgb, a) { return 'rgba(' + (ljustTema ? (LJUS_RGB[rgb] || rgb) : rgb) + ', ' + a + ')'; }
+
 const canvas = document.getElementById('simCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -792,7 +926,7 @@ const ctx = canvas.getContext('2d');
 // applyMetallicForces()/applyMetallicLatticeForce() nedan.
 const ELEMENT_DEFS = {
   H:  { symbol: 'H',  name: 'Väte',     maxValence: 1, radius: 12, mass: 1.0,  en: 2.20, color: '#ffffff' },
-  He: { symbol: 'He', name: 'Helium',   maxValence: 0, radius: 15, mass: 4.0,  en: 0.00, color: '#00d4ff' },
+  He: { symbol: 'He', name: 'Helium',   maxValence: 0, radius: 15, mass: 4.0,  en: 0.00, color: tf('#00d4ff') },
   Li: { symbol: 'Li', name: 'Litium',   maxValence: 0, radius: 20, mass: 6.9,  en: 0.98, color: '#c9d1d9', metallic: true },
   C:  { symbol: 'C',  name: 'Kol',       maxValence: 4, radius: 17, mass: 12.0, en: 2.55, color: '#8a9aa8' },
   N:  { symbol: 'N',  name: 'Kväve',     maxValence: 3, radius: 16, mass: 14.0, en: 3.04, color: '#3b82f6' },
@@ -5854,7 +5988,7 @@ function updateTempUI() {
   // v8.2: visuell varning - vid höga temperaturer närmar vi oss termisk
   // dissociation, markera detta med varm färgskala på siffran.
   label.style.color = settings.temperature > 1800 ? 'var(--danger)'
-                    : settings.temperature > 900 ? '#ffb020'
+                    : settings.temperature > 900 ? tf('#ffb020')
                     : 'var(--accent2)';
 }
 // v10.1: -/+-knapparna stegar EXAKT en visningsenhet. Respekterar
@@ -8465,7 +8599,7 @@ function startMoleculeInfoSpin(snapAtoms, snapBonds) {
       const A = proj[b.ai], B = proj[b.bi];
       if (!A || !B) continue;
       const bondDepth = (depthOf(A) + depthOf(B)) / 2;
-      mctx.strokeStyle = 'rgba(190,208,224,' + (0.35 + 0.4 * bondDepth).toFixed(3) + ')';
+      mctx.strokeStyle = tfa('190,208,224', (0.35 + 0.4 * bondDepth).toFixed(3));
       const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1;
       const nx = -dy / L, ny = dx / L; // skärmvinkelrät
       // v10.37: delokaliserad bindning (ordning 1,5) = två pinnar där den
@@ -8760,7 +8894,7 @@ function drawLewisStructureInRegion(ctx, snapAtoms, snapBonds, lewisGeometry, re
   const symGap = 15; // luft runt bokstaven så streck inte korsar den
 
   // bindningar: enkla/dubbla/trippla vita streck, stannar strax utanför symbolerna
-  ctx.strokeStyle = '#e8edf2';
+  ctx.strokeStyle = tf('#e8edf2');
   ctx.lineWidth = 2.4;
   for (const b of snapBonds) {
     const A = pts[b.ai], B = pts[b.bi];
@@ -8785,7 +8919,7 @@ function drawLewisStructureInRegion(ctx, snapAtoms, snapBonds, lewisGeometry, re
   }
 
   // elektronprickar + symboler
-  ctx.fillStyle = '#e8edf2';
+  ctx.fillStyle = tf('#e8edf2');
   for (let i = 0; i < snapAtoms.length; i++) {
     const a = snapAtoms[i], p = pts[i];
     const bAng = [];
@@ -8799,7 +8933,7 @@ function drawLewisStructureInRegion(ctx, snapAtoms, snapBonds, lewisGeometry, re
       const ang = dirs[d];
       const isPair = d < totalPairs; // första totalPairs riktningarna = fria par (2 prickar), resten = radikaler (1 prick)
       const dcx = p.x + Math.cos(ang) * (symGap + 8), dcy = p.y + Math.sin(ang) * (symGap + 8);
-      ctx.fillStyle = '#e8edf2';
+      ctx.fillStyle = tf('#e8edf2');
       if (isPair) {
         const pang = ang + Math.PI / 2, sp = 3.6;
         for (const sgn of [-1, 1]) {
@@ -8812,7 +8946,7 @@ function drawLewisStructureInRegion(ctx, snapAtoms, snapBonds, lewisGeometry, re
       }
     }
     // symbol (vit text, ingen cirkel bakom) - STORT
-    ctx.fillStyle = '#e8edf2';
+    ctx.fillStyle = tf('#e8edf2');
     ctx.font = 'bold 24px monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(a.sym, p.x, p.y + 1);
@@ -8864,7 +8998,7 @@ function drawResonanceStructuresOnCanvas(canvasId, structures) {
     const region = { x: i * (cellW + gap), y: 0, w: cellW, h: cellH };
     drawLewisStructureInRegion(ctx, structures[i].snapAtoms, structures[i].snapBonds, null, region);
     if (i < n - 1) {
-      ctx.fillStyle = '#e8edf2';
+      ctx.fillStyle = tf('#e8edf2');
       ctx.font = 'bold 22px monospace';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('↔', region.x + cellW + gap / 2, cellH / 2);
@@ -9330,15 +9464,15 @@ function drawManometer(pressure) {
 
   // Skalbåge, med rött övertrycksfält på de översta 15%
   g.lineWidth = 7;
-  g.strokeStyle = 'rgba(30, 58, 82, 0.9)';
+  g.strokeStyle = tfa('30, 58, 82', 0.9);
   g.beginPath(); g.arc(cx, cy, R, Math.PI, Math.PI * 1.85); g.stroke();
   g.strokeStyle = 'rgba(239, 68, 68, 0.75)';
   g.beginPath(); g.arc(cx, cy, R, Math.PI * 1.85, Math.PI * 2); g.stroke();
 
   // Gradering: 0, 25, 50, 75 och 100% av mätområdet
   g.lineWidth = 1.5;
-  g.strokeStyle = 'rgba(90, 122, 138, 0.9)';
-  g.fillStyle = 'rgba(200, 220, 232, 0.75)';
+  g.strokeStyle = tfa('90, 122, 138', 0.9);
+  g.fillStyle = tfa('200, 220, 232', 0.75);
   g.font = '8px monospace';
   g.textAlign = 'center'; g.textBaseline = 'middle';
   for (let i = 0; i <= 5; i++) {
@@ -9353,17 +9487,17 @@ function drawManometer(pressure) {
 
   // Nål + centrumpunkt
   const ang = Math.PI + f * Math.PI;
-  g.strokeStyle = '#00d4ff';
+  g.strokeStyle = tf('#00d4ff');
   g.lineWidth = 2.5;
   g.beginPath();
   g.moveTo(cx, cy);
   g.lineTo(cx + Math.cos(ang) * (R - 9), cy + Math.sin(ang) * (R - 9));
   g.stroke();
-  g.fillStyle = '#00d4ff';
+  g.fillStyle = tf('#00d4ff');
   g.beginPath(); g.arc(cx, cy, 4, 0, Math.PI * 2); g.fill();
 
   // Avläsning
-  g.fillStyle = '#00ff9d';
+  g.fillStyle = tf('#00ff9d');
   g.font = 'bold 13px monospace';
   g.fillText(pressure.toFixed(pressure < 100 ? 1 : 0) + ' kPa', cx, cy + 16);
 }
@@ -9389,14 +9523,14 @@ function drawConcGraph() {
 
   const yMax = Math.max(...concHistory, 0.01) * 1.15;
 
-  g.strokeStyle = 'rgba(30, 58, 82, 0.7)';
+  g.strokeStyle = tfa('30, 58, 82', 0.7);
   g.lineWidth = 1;
   for (let i = 1; i <= 3; i++) {
     const y = H * (1 - i / 4);
     g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
   }
 
-  g.strokeStyle = '#00ff9d';
+  g.strokeStyle = tf('#00ff9d');
   g.lineWidth = 1.6;
   g.beginPath();
   concHistory.forEach((v, i) => {
@@ -9406,7 +9540,7 @@ function drawConcGraph() {
   });
   g.stroke();
 
-  g.fillStyle = 'rgba(90, 122, 138, 0.9)';
+  g.fillStyle = tfa('90, 122, 138', 0.9);
   g.font = '8px monospace';
   g.textAlign = 'left'; g.textBaseline = 'top';
   g.fillText(yMax.toFixed(2), 3, 2);
@@ -9534,13 +9668,13 @@ function updateLiveStats() {
       waterStateEl.style.color = 'var(--text-dim)';
     } else if (agg.state === 'fast') {
       waterStateEl.innerText = 'FAST (is)';
-      waterStateEl.style.color = '#7dd3fc';
+      waterStateEl.style.color = tf('#7dd3fc');
     } else if (agg.state === 'flytande') {
       waterStateEl.innerText = 'FLYTANDE';
       waterStateEl.style.color = 'var(--accent2)';
     } else {
       waterStateEl.innerText = 'GAS (\u00e5nga)';
-      waterStateEl.style.color = '#ffb020';
+      waterStateEl.style.color = tf('#ffb020');
     }
   }
 
@@ -9555,7 +9689,7 @@ function updateLiveStats() {
     } else {
       const label = ph.ph < 6.5 ? ' (sur)' : ph.ph > 7.5 ? ' (basisk)' : ' (neutral)';
       phEl.innerText = ph.ph.toFixed(2) + label;
-      phEl.style.color = ph.ph < 6.5 ? 'var(--danger)' : ph.ph > 7.5 ? '#5cb3ff' : 'var(--text-dim)';
+      phEl.style.color = ph.ph < 6.5 ? 'var(--danger)' : ph.ph > 7.5 ? tf('#5cb3ff') : 'var(--text-dim)';
     }
   }
 
@@ -9583,7 +9717,7 @@ function updateLiveStats() {
       const pct = Math.round(salt.latticeFraction * 100);
       const label = pct >= 90 ? ' (intakt)' : pct <= 15 ? ' (upplöst)' : ' (löses upp...)';
       saltEl.innerText = pct + '%' + label;
-      saltEl.style.color = pct >= 90 ? '#7dd3fc' : pct <= 15 ? 'var(--accent2)' : '#ffb020';
+      saltEl.style.color = pct >= 90 ? tf('#7dd3fc') : pct <= 15 ? 'var(--accent2)' : tf('#ffb020');
     }
   }
 }
@@ -11119,10 +11253,10 @@ function drawDipoleLegend() {
   // v8.5: Dynamisk legend - visar bara rader för de lager som är påslagna.
   const rows = [];
   if (showIntermolecular) {
-    rows.push({ type: 'dash', color: HBOND_COLOR,  label: 'Vätebindning (H···O/N/F)' });
-    rows.push({ type: 'dash', color: DIPOLE_COLOR, label: 'Övrig dipol-dipol-bindning' });
-    rows.push({ type: 'solid', color: ION_BOND_COLOR,   label: 'Jonbindning (+ ↔ −)' });      // v10.8
-    rows.push({ type: 'dash',  color: ION_DIPOLE_COLOR, label: 'Jon-dipol (jon ↔ polär)' }); // v10.8
+    rows.push({ type: 'dash', color: tf(HBOND_COLOR),  label: 'Vätebindning (H···O/N/F)' });
+    rows.push({ type: 'dash', color: tf(DIPOLE_COLOR), label: 'Övrig dipol-dipol-bindning' });
+    rows.push({ type: 'solid', color: tf(ION_BOND_COLOR),   label: 'Jonbindning (+ ↔ −)' });      // v10.8
+    rows.push({ type: 'dash',  color: tf(ION_DIPOLE_COLOR), label: 'Jon-dipol (jon ↔ polär)' }); // v10.8
   }
   if (showChargeMap) {
     rows.push({ type: 'glow', color: chargePotentialColor(-CHARGE_CLOUD_QMAX, 0.85), label: 'Elektronmoln: δ− negativ pol' });
@@ -11137,15 +11271,15 @@ function drawDipoleLegend() {
   const h = 28 + rows.length * 16;
   const x = pad, y = canvas.height - h - pad;
 
-  ctx.fillStyle = 'rgba(8, 12, 16, 0.82)';
-  ctx.strokeStyle = 'rgba(30, 58, 82, 0.9)';
+  ctx.fillStyle = tfa('8, 12, 16', 0.82);
+  ctx.strokeStyle = tfa('30, 58, 82', 0.9);
   ctx.lineWidth = 1;
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(x, y, w, h, 6); else ctx.rect(x, y, w, h);
   ctx.fill(); ctx.stroke();
 
   ctx.font = 'bold 11px monospace';
-  ctx.fillStyle = 'rgba(200, 220, 232, 0.9)';
+  ctx.fillStyle = tfa('200, 220, 232', 0.9);
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   ctx.fillText('TECKENFÖRKLARING', x + 12, y + 16);
 
@@ -11168,7 +11302,7 @@ function drawDipoleLegend() {
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(x + 28, rowY, 7, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.fillStyle = 'rgba(200, 220, 232, 0.9)';
+    ctx.fillStyle = tfa('200, 220, 232', 0.9);
     ctx.font = '11px monospace';
     ctx.fillText(row.label, x + 54, rowY);
   });
@@ -11183,7 +11317,7 @@ function draw() {
   const bounds = getSimBounds();
   ctx.setTransform(bounds.zoom, 0, 0, bounds.zoom, -bounds.offsetX * bounds.zoom, -bounds.offsetY * bounds.zoom);
 
-  ctx.strokeStyle = 'rgba(30, 58, 82, 0.6)';
+  ctx.strokeStyle = tfa('30, 58, 82', 0.6);
   ctx.lineWidth = 2;
   ctx.strokeRect(bounds.offsetX + 1, bounds.offsetY + 1, bounds.width - 2, bounds.height - 2);
 
@@ -11195,10 +11329,10 @@ function draw() {
     ctx.textAlign = 'center';
     const gcx = bounds.offsetX + bounds.width / 2;
     const gcy = bounds.offsetY + bounds.height / 2;
-    ctx.fillStyle = 'rgba(0, 212, 255, 0.55)';
+    ctx.fillStyle = tfa('0, 212, 255', 0.55);
     ctx.font = '600 15px "Segoe UI", system-ui, sans-serif';
     ctx.fillText('Rummet \u00e4r tomt', gcx, gcy - 26);
-    ctx.fillStyle = 'rgba(154, 180, 200, 0.75)';
+    ctx.fillStyle = tfa('154, 180, 200', 0.75);
     ctx.font = '13px "Segoe UI", system-ui, sans-serif';
     ctx.fillText('V\u00e4lj ett atomslag eller en f\u00e4rdig f\u00f6rening i atompanelen och klicka h\u00e4r f\u00f6r att placera.', gcx, gcy);
     ctx.fillText('Eller \u00f6ppna UPPDRAG f\u00f6r ett guidat experiment.', gcx, gcy + 22);
@@ -11218,8 +11352,8 @@ function draw() {
   let portHeight = Math.min(80, bounds.height * 0.5);
   let portY = bounds.offsetY + bounds.height / 2 - portHeight / 2;
   let portGrad = ctx.createLinearGradient(bounds.offsetX, portY, bounds.offsetX + 8, portY);
-  portGrad.addColorStop(0, 'rgba(0, 212, 255, 0.8)');
-  portGrad.addColorStop(1, 'rgba(0, 212, 255, 0.0)');
+  portGrad.addColorStop(0, tfa('0, 212, 255', 0.8));
+  portGrad.addColorStop(1, tfa('0, 212, 255', 0.0));
   ctx.fillStyle = portGrad;
   ctx.fillRect(bounds.offsetX, portY, 15, portHeight);
   ctx.restore();
@@ -11227,9 +11361,9 @@ function draw() {
   // v8.7: Skiljevägg - solid list mitt i rummet
   if (dividerEnabled) {
     const wx = dividerX(bounds);
-    ctx.fillStyle = 'rgba(30, 58, 82, 0.95)';
+    ctx.fillStyle = tfa('30, 58, 82', 0.95);
     ctx.fillRect(wx - DIVIDER_HALF_W, bounds.offsetY, DIVIDER_HALF_W * 2, bounds.height);
-    ctx.strokeStyle = 'rgba(0, 212, 255, 0.35)';
+    ctx.strokeStyle = tfa('0, 212, 255', 0.35);
     ctx.lineWidth = 1;
     ctx.strokeRect(wx - DIVIDER_HALF_W, bounds.offsetY, DIVIDER_HALF_W * 2, bounds.height);
   }
@@ -11290,9 +11424,9 @@ function draw() {
           const pulse = 0.5 + 0.5 * Math.sin(simulationTime * 0.28 + a.id * 1.3);
           const alpha = 0.34 + 0.22 * pulse;            // tydlig men levande
           const g = ctx.createRadialGradient(p.x, p.y, rAtom * 0.4, p.x, p.y, rOuter);
-          g.addColorStop(0, `rgba(255, 221, 87, ${alpha})`);
-          g.addColorStop(rAtom / rOuter, `rgba(255, 221, 87, ${alpha})`); // full styrka ända ut till konturen
-          g.addColorStop(1, 'rgba(255, 221, 87, 0)');   // tonar ut strax utanför
+          g.addColorStop(0, tfa('255, 221, 87', alpha));
+          g.addColorStop(rAtom / rOuter, tfa('255, 221, 87', alpha)); // full styrka ända ut till konturen
+          g.addColorStop(1, tfa('255, 221, 87', 0));   // tonar ut strax utanför
           ctx.fillStyle = g;
           ctx.beginPath(); ctx.arc(p.x, p.y, rOuter, 0, Math.PI * 2); ctx.fill();
         }
@@ -11384,7 +11518,7 @@ function draw() {
           if (bestA && bestR < (bestA.radius + bestB.radius) * 2.3) {
             const pa = dispMap.get(bestA.id), pb = dispMap.get(bestB.id);
             ctx.setLineDash([]);
-            ctx.strokeStyle = ION_BOND_COLOR;
+            ctx.strokeStyle = tf(ION_BOND_COLOR);
             ctx.lineWidth = 2.4;
             ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
             ctx.lineWidth = 1.7;
@@ -11409,7 +11543,7 @@ function draw() {
             }
             if (best && bestR < (ionAtom.radius + best.radius) * 2.6) {
               const pa = dispMap.get(ionAtom.id), pb = dispMap.get(best.id);
-              ctx.strokeStyle = ION_DIPOLE_COLOR;
+              ctx.strokeStyle = tf(ION_DIPOLE_COLOR);
               ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
             }
           }
@@ -11421,7 +11555,7 @@ function draw() {
   ctx.lineWidth = 1.7;
   for (const c of imfBest.values()) {
     const pa = dispMap.get(c.a.id), pb = dispMap.get(c.b.id);
-    ctx.strokeStyle = c.hb ? HBOND_COLOR : DIPOLE_COLOR;
+    ctx.strokeStyle = c.hb ? tf(HBOND_COLOR) : tf(DIPOLE_COLOR);
     ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
   }
   ctx.setLineDash([]);
@@ -11536,7 +11670,7 @@ function draw() {
         const perpLen = Math.hypot(d[0], d[1]) || 1;
         const px = -d[1] / perpLen, py = d[0] / perpLen;
         const dotOff = lpR * 0.38;
-        ctx.fillStyle = LP_DOT_COLOR;
+        ctx.fillStyle = ljustTema ? tfa('235, 230, 255', 0.95) : LP_DOT_COLOR;
         ctx.beginPath(); ctx.arc(lpX + px * dotOff, lpY + py * dotOff, 1.8, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(lpX - px * dotOff, lpY - py * dotOff, 1.8, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
@@ -11558,12 +11692,12 @@ function draw() {
         ctx.globalAlpha = shade * pulse;
         // Svag halo
         let haloGrad = ctx.createRadialGradient(rX, rY, 0.5, rX, rY, 6.5);
-        haloGrad.addColorStop(0, 'rgba(255, 176, 32, 0.5)');
-        haloGrad.addColorStop(1, 'rgba(255, 176, 32, 0)');
+        haloGrad.addColorStop(0, tfa('255, 176, 32', 0.5));
+        haloGrad.addColorStop(1, tfa('255, 176, 32', 0));
         ctx.beginPath(); ctx.arc(rX, rY, 6.5, 0, Math.PI * 2);
         ctx.fillStyle = haloGrad; ctx.fill();
         // Själva elektronen
-        ctx.fillStyle = RADICAL_COLOR;
+        ctx.fillStyle = tf(RADICAL_COLOR);
         ctx.beginPath(); ctx.arc(rX, rY, 2.2, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
       }
@@ -11616,7 +11750,7 @@ function draw() {
     // v8.7: markera spårade atomer med pulserande ljusring
     if (trackedTrails.has(a.id)) {
       const pulse = 0.55 + 0.45 * Math.sin(simulationTime * 0.3 + a.id);
-      ctx.strokeStyle = 'rgba(0, 212, 255, ' + pulse.toFixed(3) + ')';
+      ctx.strokeStyle = tfa('0, 212, 255', pulse.toFixed(3));
       ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.arc(lp.x, lp.y, r + 4, 0, Math.PI * 2); ctx.stroke();
     }
@@ -11683,7 +11817,7 @@ function draw() {
       for (const a of mol.atoms) {
         rMax = Math.max(rMax, Math.hypot(a.x - mol.cx, a.y - mol.cy) + a.radius);
       }
-      ctx.strokeStyle = 'rgba(0, 212, 255, ' + hlPulse2.toFixed(3) + ')';
+      ctx.strokeStyle = tfa('0, 212, 255', hlPulse2.toFixed(3));
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.arc(mol.cx, mol.cy, rMax + 7, 0, Math.PI * 2);
@@ -11701,13 +11835,13 @@ function draw() {
     const fx = bondFormEffects[i];
     const rgb = fx.rgb || '0, 255, 157';
     const radius = 8 + (1 - fx.ttl) * 26;
-    ctx.strokeStyle = `rgba(${rgb}, ${0.8 * fx.ttl})`;
+    ctx.strokeStyle = tfa(rgb, 0.8 * fx.ttl);
     ctx.lineWidth = 2.5 * fx.ttl;
     ctx.beginPath();
     ctx.arc(fx.x, fx.y, radius, 0, Math.PI * 2);
     ctx.stroke();
     // Liten inre glöd som förstärker "energi frigörs"-intrycket
-    ctx.fillStyle = `rgba(200, 255, 230, ${0.35 * fx.ttl})`;
+    ctx.fillStyle = tfa('200, 255, 230', 0.35 * fx.ttl);
     ctx.beginPath();
     ctx.arc(fx.x, fx.y, 5 * fx.ttl, 0, Math.PI * 2);
     ctx.fill();
@@ -11827,6 +11961,8 @@ function loop(timestamp) {
 
   requestAnimationFrame(loop);
 }
+// Temaknappen. Rummet ritas om varje bildruta, så bytet syns direkt.
+if (typeof matchMedia === 'function') Tema.init(t => { ljustTema = t === 'ljust'; });
 requestAnimationFrame(loop);
 </script>
 </body>
