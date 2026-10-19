@@ -11376,35 +11376,28 @@ function draw() {
   // v10.49: bindningsstrecken (ball-and-stick) hoppas över när laddningskartan
   // är på - EPS-ytan ovan står ensam (grannklickarnas överlapp visar
   // konnektiviteten implicit; bundna atomer ligger tätt och flyter ihop).
+  // v10.74 (Christian, med en läroboksbild som förebild): grå, skuggade
+  // PINNAR som i en ball-and-stick-modell i stället för de neongröna strecken.
+  // Djupet visas med ljusstyrka (inte genomskinlighet) så att en bortre pinne
+  // aldrig lyser igenom en främre sfär. Fler-bindningar = parallella, smalare
+  // pinnar; resonans (ordning 1,5) = en hel + en streckad, som förut.
   if (!showChargeMap) for (let mol of molecules) {
     for (let b of mol.bonds) {
       const pa = dispMap.get(b.a.id), pb = dispMap.get(b.b.id);
-      let dx = pb.x - pa.x; let dy = pb.y - pa.y;
-      let len = Math.hypot(dx, dy) || 1;
-      let nx = -dy / len; let ny = dx / len;
-      let offset = 3; let avgZ = (pa.z + pb.z) / 2;
-      ctx.strokeStyle = '#00ff9d';
-      ctx.lineWidth = 2.5;
-      ctx.globalAlpha = Math.max(0.4, Math.min(1, 1 + avgZ * 0.01));
-
-      if (b.resonant) {
-        // v10.37: delokaliserad bindning (ordning 1,5) - heldraget + parallellt
-        // STRECKAT streck, samma konvention som Lewis-/molekylinfo-vyerna.
-        ctx.beginPath(); ctx.moveTo(pa.x + nx * offset, pa.y + ny * offset); ctx.lineTo(pb.x + nx * offset, pb.y + ny * offset); ctx.stroke();
-        if (ctx.setLineDash) ctx.setLineDash([5, 4]);
-        ctx.beginPath(); ctx.moveTo(pa.x - nx * offset, pa.y - ny * offset); ctx.lineTo(pb.x - nx * offset, pb.y - ny * offset); ctx.stroke();
-        if (ctx.setLineDash) ctx.setLineDash([]);
-      } else if (b.order === 1) {
-        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-      } else if (b.order === 2) {
-        ctx.beginPath(); ctx.moveTo(pa.x + nx * offset, pa.y + ny * offset); ctx.lineTo(pb.x + nx * offset, pb.y + ny * offset); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(pa.x - nx * offset, pa.y - ny * offset); ctx.lineTo(pb.x - nx * offset, pb.y - ny * offset); ctx.stroke();
-      } else if (b.order === 3) {
-        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(pa.x + nx * offset * 1.6, pa.y + ny * offset * 1.6); ctx.lineTo(pb.x + nx * offset * 1.6, pb.y + ny * offset * 1.6); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(pa.x - nx * offset * 1.6, pa.y - ny * offset * 1.6); ctx.lineTo(pb.x - nx * offset * 1.6, pb.y - ny * offset * 1.6); ctx.stroke();
+      const dx = pb.x - pa.x, dy = pb.y - pa.y;
+      const len = Math.hypot(dx, dy) || 1;
+      let nx = -dy / len, ny = dx / len;
+      if (ny > 0 || (ny === 0 && nx > 0)) { nx = -nx; ny = -ny; } // normalen mot ljuset (uppe till vänster)
+      const avgZ = (pa.z + pb.z) / 2;
+      const bright = Math.max(0.55, Math.min(1, 1 + avgZ * 0.012));
+      const k = Math.max(0.75, Math.min(1.25, 1 + avgZ * 0.012));
+      const ord = b.resonant ? 2 : (b.order || 1);
+      const w = (ord === 1 ? BOND_STICK_WIDTH : ord === 2 ? BOND_STICK_WIDTH * 0.62 : BOND_STICK_WIDTH * 0.5) * k;
+      const gap = (ord === 3 ? w * 1.55 : w * 1.25);
+      for (let i = 0; i < ord; i++) {
+        const off = (i - (ord - 1) / 2) * gap;
+        drawBondStick(pa.x + nx * off, pa.y + ny * off, pb.x + nx * off, pb.y + ny * off, w, bright, nx, ny, b.resonant && i === 1);
       }
-      ctx.globalAlpha = 1;
     }
   }
 
@@ -11422,7 +11415,11 @@ function draw() {
     // etiketten använder samma p som allt annat - både i EPS-läget och normalt.
     const lp = p;
     const depthScale = Math.max(0.65, Math.min(1.35, 1 + p.z * 0.012));
-    const r = a.radius * depthScale;
+    // v10.74: ball-and-stick ritar sfären MINDRE än atomens fysiska radie
+    // (ATOM_DRAW_SCALE) så att bindningspinnarna syns mellan bundna atomer.
+    // Bara utseendet - kollisioner och klickträffar använder fortfarande
+    // a.radius. EPS-ytan (laddningskartan) behåller full storlek.
+    const r = a.radius * depthScale * (showChargeMap ? 1 : ATOM_DRAW_SCALE);
     const shade = Math.max(0.55, Math.min(1, 1 + p.z * 0.012));
 
     // v8.3: Rita atomens fria elektronpar som halvtransparenta moln med två
@@ -11434,6 +11431,10 @@ function draw() {
       const reveal = (mol && mol.lpReveal !== undefined) ? mol.lpReveal : 1;
       if (reveal > 0) for (const lp of a.lonePairsLocal) {
         const d = rotateMolDir(mol, lp);
+        // v10.74: MEDVETET från den FYSISKA radien, inte den ritade (r) - med
+        // ball-and-stick-sfären mindre sticker molnen då ut tydligt runt den.
+        // (Proportionerat mot r hamnade de nästan helt bakom den nu täckande
+        // sfären - prövat.)
         const lpDist = a.radius * LP_DIST_FACTOR * depthScale;
         const lpX = p.x + d[0] * lpDist;
         const lpY = p.y + d[1] * lpDist;
@@ -11491,25 +11492,25 @@ function draw() {
     // sfären (och laddningsringen) av EPS-ytan som ritades längst upp - här
     // hoppas de alltså över. Bokstavsetiketten ritas ändå (nedan) så atomen
     // går att identifiera ovanpå den färgade ytan.
+    // v10.74 (Christian: "det verkar finnas en shine på atomerna ... något som
+    // mer liknar bilden"): matt, OPAK sfär med ljuset snett uppifrån-vänster
+    // - samma ljussättning som molekylinfons 3D-modell (v10.36). Tidigare låg
+    // en vit glansfläck mitt i sfären (där bokstaven sitter, så den blev
+    // suddig), kanten tonade ut i genomskinlighet och djupet visades med
+    // globalAlpha, så bortre atomer lyste igenom främre. Nu bär ljusstyrkan
+    // djupet och sfären är helt täckande. Polaritetsringen (v10.58) är borttagen
+    // ur standardvyn - bindningspolaritet visas av lagret Laddningskarta.
     if (!showChargeMap) {
-      let grad = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, r);
-      grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.3, a.color);
-      grad.addColorStop(0.9, a.color); grad.addColorStop(1, 'rgba(0,0,0,0)');
-
-      ctx.globalAlpha = shade;
+      const lx = p.x - r * 0.38, ly = p.y - r * 0.42;
+      const grad = ctx.createRadialGradient(lx, ly, r * 0.05, p.x, p.y, r);
+      grad.addColorStop(0, molinfoShade(a.color, shade + 0.55));
+      grad.addColorStop(0.2, molinfoShade(a.color, shade * 0.97 + 0.08));
+      grad.addColorStop(0.65, molinfoShade(a.color, shade * 0.88));
+      grad.addColorStop(1, molinfoShade(a.color, shade * 0.42));
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fillStyle = grad; ctx.fill();
-
-      // v10.58: samma bindningspolaritet som molnet, så de två visningarna av
-      // laddning aldrig kan säga emot varandra. Visuellt oförändrat - tröskeln
-      // är 0,02 och varje atom som passerade den förut passerar den fortfarande
-      // (metanens kol går från −0,168 till −0,042, alltjämt över tröskeln).
-      // MEDVETET utan chargeMapValues jonterm: ringen ritas bara när laddnings-
-      // kartan är AV, och i det läget bär den intilliggande ±-brickan redan
-      // jonladdningen. Ringen säger alltså "hur polär är bindningen här".
-      const qRing = chargePerBond(a);
-      ctx.strokeStyle = Math.abs(qRing) > 0.02 ? (qRing > 0 ? 'rgba(0, 150, 255, 0.6)' : 'rgba(255, 50, 50, 0.6)') : 'rgba(255,255,25,0.15)';
-      ctx.lineWidth = Math.abs(qRing) > 0.02 ? 2 : 1;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
 
@@ -11519,9 +11520,13 @@ function draw() {
     // en tyngre atom (annars "C"+"H" -> "B" på t.ex. metans axiella väte).
     const labelHidden = showChargeMap && aMol && chargeMapLabelOccluded(aMol, a, dispMap);
     if (!labelHidden) {
-      ctx.globalAlpha = showChargeMap ? 1 : shade;
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.font = `bold ${Math.max(9, r * 0.7)}px monospace`;
+      // v10.74: i standardvyn mörk bokstav på ljusa atomer (H, Cl ...) och
+      // vit på mörka - vit text på det vita vätet syntes knappt. Full
+      // opacitet: sfären är numera täckande och bär djupet själv.
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = showChargeMap ? 'rgba(255,255,255,0.95)'
+        : (colorLuminance(a.color) > 0.55 ? 'rgba(20, 26, 32, 0.85)' : 'rgba(255, 255, 255, 0.92)');
+      ctx.font = `bold ${Math.max(9, showChargeMap ? r * 0.7 : r * 0.85)}px monospace`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(a.symbol, lp.x, lp.y);
       ctx.globalAlpha = 1;
@@ -11552,13 +11557,15 @@ function draw() {
     const fracMol = molByAtom.get(a.id);
     const frac = resonanceChargeFraction(fracMol, a);
     if (fc !== 0 || frac) {
-      const bx = lp.x + r * 0.85, by = lp.y - r * 0.85, br = 7.5;
+      // v10.74: något mindre bricka i ball-and-stick, där sfären ritas mindre.
+      const br = showChargeMap ? 7.5 : 6.5;
+      const bx = lp.x + r * 0.85, by = lp.y - r * 0.85;
       ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2);
       const neg = frac ? frac.num < 0 : fc < 0;
       ctx.fillStyle = neg ? 'rgba(230, 60, 60, 0.95)' : 'rgba(40, 120, 255, 0.95)';
       ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.3; ctx.stroke();
-      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 10px monospace';
+      ctx.fillStyle = '#ffffff'; ctx.font = `bold ${showChargeMap ? 10 : 9}px monospace`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(chargeSuffixPlain(fc, frac), bx, by);
     }
@@ -11635,6 +11642,42 @@ function draw() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     flashAlpha -= 0.035; 
   }
+}
+
+// v10.74: ball-and-stick-utseendet i standardvyn (se draw()).
+const ATOM_DRAW_SCALE = 0.72;   // ritad sfär / fysisk radie - lämnar plats för pinnen
+const BOND_STICK_WIDTH = 5.5;   // px, enkelbindning (dubbel/trippel smalare)
+const BOND_STICK_COLOR = '#a9b3bc';
+// Relativ luminans (0..1) för en #rrggbb-färg - väljer mörk/ljus etikett.
+function colorLuminance(color) {
+  const m = /^#([0-9a-f]{6})$/i.exec(color || '');
+  if (!m) return 0;
+  const n = parseInt(m[1], 16);
+  return (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255;
+}
+// En skuggad pinne: mörk kant, grå kropp och en smal ljusreflex på sidan mot
+// ljuset (nx, ny = enhetsnormal som pekar uppåt-vänster). `dashed` = resonans-
+// pinnen, ritad platt och streckad så den skiljer sig tydligt från en hel.
+function drawBondStick(x1, y1, x2, y2, w, bright, nx, ny, dashed) {
+  ctx.lineCap = 'butt';
+  if (dashed) {
+    if (ctx.setLineDash) ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = molinfoShade(BOND_STICK_COLOR, bright);
+    ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (ctx.setLineDash) ctx.setLineDash([]);
+    return;
+  }
+  ctx.strokeStyle = molinfoShade(BOND_STICK_COLOR, bright * 0.45);
+  ctx.lineWidth = w + 1.6;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.strokeStyle = molinfoShade(BOND_STICK_COLOR, bright * 0.92);
+  ctx.lineWidth = w;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const o = w * 0.22;
+  ctx.strokeStyle = molinfoShade(BOND_STICK_COLOR, bright + 0.45);
+  ctx.lineWidth = Math.max(1, w * 0.28);
+  ctx.beginPath(); ctx.moveTo(x1 + nx * o, y1 + ny * o); ctx.lineTo(x2 + nx * o, y2 + ny * o); ctx.stroke();
 }
 
 // v10.22: placera den dragna molekylen så att den GRABBADE atomen ligger under
