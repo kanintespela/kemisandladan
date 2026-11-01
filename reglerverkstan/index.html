@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<!-- © 2026 Christian Broselid. All rights reserved. -->
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reglerverkstan 0.1</title>
+<script id="tema-start">
+  // Tema före första ritningen, så att sidan inte blinkar till i fel tema.
+  // Ett sparat val (temaknappen) gäller i alla apparna på webbplatsen;
+  // utan sparat val följer appen datorns inställning.
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('kemiappar-tema'); } catch (e) {}
+    if (t !== 'ljust' && t !== 'morkt') t = matchMedia('(prefers-color-scheme: light)').matches ? 'ljust' : 'morkt';
+    document.documentElement.dataset.tema = t;
+  })();
+</script>
+<style>
+  :root {
+    --bg:        #080c10;
+    --bg2:       #0d1520;
+    --bg3:       #111e2e;
+    --border:    #1e3a52;
+    --accent:    #00d4ff;
+    --accent2:   #00ff9d;
+    --warm:      #ff9f43;
+    --danger:    #ef4444;
+    --text:      #c8dce8;
+    --text-dim:  #7f9db0;
+    --font-ui:   system-ui, sans-serif;
+    --font-mono: 'Courier New', monospace;
+    --glukos:    #ff9f43;
+    --insulin:   #00d4ff;
+    --glukagon:  #b794f6;
+    --blod:      #e0566a;
+    --positiv:   #ff6b6b;
+    --negativ:   #00ff9d;
+    --skymning:  rgba(0,0,0,0.6);
+    color-scheme: dark;
+  }
+  /* Ljust tema: samma roller, mörkare accenter så att de syns mot vitt. */
+  :root[data-tema="ljust"] {
+    --bg:        #eef2f6;
+    --bg2:       #ffffff;
+    --bg3:       #e6edf3;
+    --border:    #bccbd7;
+    --accent:    #0072a3;
+    --accent2:   #00805a;
+    --warm:      #b45309;
+    --danger:    #c62828;
+    --text:      #18252f;
+    --text-dim:  #52687a;
+    --glukos:    #c26a00;
+    --insulin:   #0072a3;
+    --glukagon:  #6d3fc0;
+    --blod:      #c0334a;
+    --positiv:   #c62828;
+    --negativ:   #00805a;
+    --skymning:  rgba(20,35,50,0.4);
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font-ui);
+    font-size: 15px; line-height: 1.45; height: 100vh;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px; padding: 6px 14px; flex-wrap: wrap;
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .2px; }
+  .hem-lank { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  .hem-lank:hover { color: var(--accent); }
+  .dim { color: var(--text-dim); font-size: 13px; }
+  select, .knapp, .tema-knapp {
+    background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .knapp:hover:not(:disabled), .tema-knapp:hover, select:hover { border-color: var(--accent); }
+  .knapp:disabled { opacity: .45; cursor: default; }
+  .knapp.primar { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+  :root[data-tema="ljust"] .knapp.primar { color: #fff; }
+  .knapp.liten { padding: 3px 8px; font-size: 13px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tema-knapp { padding: 5px 8px; display: flex; }
+  .styr { display: flex; align-items: center; gap: 8px; margin-left: 10px; flex-wrap: wrap; }
+  .styr .tid { font-family: var(--font-mono); font-size: 14px; min-width: 205px; }
+  .tema-knapp svg { width: 18px; height: 18px; }
+  .ikon-sol { display: block; } .ikon-mane { display: none; }
+  :root[data-tema="ljust"] .ikon-sol { display: none; }
+  :root[data-tema="ljust"] .ikon-mane { display: block; }
+
+  main {
+    flex: 1; display: grid; gap: 8px; padding: 8px 12px; min-height: 0;
+    grid-template-columns: 270px minmax(0, 1fr) 262px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "v m h" "v k k";
+  }
+  .panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; min-height: 0; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); margin-bottom: 8px; font-weight: 600; }
+  .vanster { grid-area: v; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; }
+  .mitt { grid-area: m; display: flex; flex-direction: column; padding: 6px; min-height: 0; }
+  .hoger { grid-area: h; overflow-y: auto; }
+  .kurvor { grid-area: k; padding: 6px 10px 4px; }
+
+  /* Krets */
+  #krets { width: 100%; flex: 1; min-height: 0; display: block; }
+  .segment { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .segment button { background: var(--bg3); color: var(--text); border: 0; border-right: 1px solid var(--border); padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  .segment button:last-child { border-right: 0; }
+  .segment button[aria-pressed="true"] { background: var(--accent); color: var(--bg); font-weight: 600; }
+  :root[data-tema="ljust"] .segment button[aria-pressed="true"] { color: #fff; }
+
+  /* SVG-delar */
+  svg text { font-family: var(--font-ui); fill: var(--text); }
+  .t-dim { fill: var(--text-dim) !important; }
+  .t-fet { font-weight: 700; }
+  .vagg { fill: var(--bg2); stroke: var(--border); stroke-width: 2; }
+  .vatska { fill: var(--blod); fill-opacity: .36; }
+  .vatska-yta { stroke: var(--blod); stroke-width: 2; stroke-opacity: .8; }
+  .band { fill: var(--accent2); fill-opacity: .13; }
+  .bord { stroke: var(--text-dim); stroke-width: 1.5; stroke-dasharray: 6 4; }
+  .tank-ram { fill: none; stroke: var(--border); stroke-width: 3; }
+  .ror-ut { fill: none; stroke: var(--border); stroke-width: 30; stroke-linecap: butt; stroke-linejoin: round; }
+  .ror-in { fill: none; stroke: var(--bg3); stroke-width: 24; stroke-linecap: butt; stroke-linejoin: round; }
+  .box { fill: var(--bg3); stroke: var(--border); stroke-width: 2; }
+  .fyll { fill: var(--glukos); fill-opacity: .38; }
+  .pankreas { fill: var(--accent2); fill-opacity: .06; stroke: var(--accent2); stroke-opacity: .5; stroke-width: 2; stroke-dasharray: 3 5; }
+  .led { fill: none; stroke-width: 2; stroke-dasharray: 5 5; opacity: .6; }
+  .led.insulin { stroke: var(--insulin); } .led.glukagon { stroke: var(--glukagon); } .led.avkann { stroke: var(--text-dim); }
+  .cell { stroke-width: 2; }
+  .cell.beta { fill: var(--insulin); stroke: var(--insulin); } .cell.alfa { fill: var(--glukagon); stroke: var(--glukagon); }
+  .cell.dod { fill: none !important; stroke-dasharray: 3 3; opacity: .45; }
+  .glod.beta { fill: var(--insulin); } .glod.alfa { fill: var(--glukagon); }
+  .chip { fill: var(--bg2); stroke-width: 2; }
+  .chip.insulin { stroke: var(--insulin); } .chip.glukagon { stroke: var(--glukagon); }
+  .mat { fill-opacity: .45; } .mat.insulin { fill: var(--insulin); } .mat.glukagon { fill: var(--glukagon); }
+  .ventil { fill: var(--bg2); stroke: var(--border); stroke-width: 3; }
+  .ventilstav { stroke: var(--text); stroke-width: 5; stroke-linecap: round; }
+  .recept { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke: var(--insulin); }
+  .recept.dod { opacity: .22; }
+  .p-glukos { fill: var(--glukos); } .p-insulin { fill: var(--insulin); } .p-glukagon { fill: var(--glukagon); }
+  .punkt { fill: var(--glukos); fill-opacity: .8; }
+  .box-text { paint-order: stroke; stroke: var(--bg3); stroke-width: 4px; stroke-linejoin: round; }
+  .ram { fill: transparent; pointer-events: all; stroke: transparent; stroke-width: 2; stroke-dasharray: 5 4; rx: 8; }
+  .nod { cursor: pointer; outline: none; }
+  .nod:hover .ram { stroke: var(--text-dim); }
+  .nod:focus-visible .ram { stroke: var(--accent); }
+  .nod.vald .ram { stroke: var(--accent); }
+  .kant { fill: none; stroke-width: 6; stroke-linecap: round; opacity: 0; transition: opacity .25s; }
+  .kant.pa { opacity: .9; stroke-dasharray: 10 8; animation: dash 1.2s linear infinite; }
+  .kant.k0 { stroke: var(--insulin); } .kant.k1 { stroke: var(--glukagon); } .kant.k2 { stroke: var(--warm); } .kant.k3 { stroke: var(--accent2); }
+  @keyframes dash { to { stroke-dashoffset: -36; } }
+  .badge circle { fill: var(--bg); stroke: var(--text-dim); stroke-width: 2; }
+  .badge text { font-size: 17px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+  .badge.plus text { fill: var(--accent2); } .badge.minus text { fill: var(--danger); }
+  .badge.plus circle { stroke: var(--accent2); } .badge.minus circle { stroke: var(--danger); }
+  .badge.dold { display: none; }
+  .tagg { font-size: 14px; font-weight: 700; }
+  @media (prefers-reduced-motion: reduce) { .kant.pa { animation: none; } }
+
+  /* Diagram */
+  .kurv-rad { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 0 0 2px 2px; }
+  .kurv-rad h2 { margin: 0; }
+  .forklaring { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text-dim); }
+  .forklaring i { display: inline-block; width: 18px; height: 0; border-top: 3px solid; }
+  .forklaring i.streck { border-top-style: dashed; }
+  #kurv-g { height: 116px; } #kurv-h { height: 78px; }
+  .diagram { width: 100%; height: 100%; display: block; touch-action: none; }
+  .diagram text { font-size: 12px; fill: var(--text-dim); }
+  .diagram .rut { stroke: var(--border); stroke-width: 1; }
+  .diagram .axel { stroke: var(--text-dim); stroke-width: 1; }
+  .diagram .s-glukos { fill: none; stroke: var(--glukos); stroke-width: 3; stroke-linejoin: round; }
+  .diagram .s-insulin { fill: none; stroke: var(--insulin); stroke-width: 2.5; }
+  .diagram .s-glukagon { fill: none; stroke: var(--glukagon); stroke-width: 2.5; }
+  .diagram .s-frisk { fill: none; stroke: var(--text-dim); stroke-width: 2; stroke-dasharray: 7 5; }
+  .diagram .s-pred { fill: none; stroke: var(--accent2); stroke-width: 2.5; stroke-dasharray: 2 5; stroke-linecap: round; }
+  .diagram .normal { fill: var(--accent2); fill-opacity: .12; }
+  .diagram .hand { stroke: var(--text-dim); stroke-width: 1; stroke-dasharray: 2 3; }
+  .diagram .markor { fill: var(--text); font-size: 12px; }
+  .diagram .markor-ruta { fill: var(--bg3); stroke: var(--border); }
+  .diagram .markor-linje { stroke: var(--warm); stroke-width: 1.5; stroke-dasharray: 3 3; }
+  .diagram .hair { stroke: var(--text); stroke-width: 1.5; }
+  .diagram .prick { fill: var(--glukos); stroke: var(--bg2); stroke-width: 2; }
+  .diagram .lappen { fill: var(--text-dim); font-size: 14px; }
+  .diagram .lappen2 { fill: var(--text-dim); font-size: 12px; font-weight: 600; }
+
+  /* Vänsterpanel */
+  .steg { display: flex; gap: 6px; margin: 4px 0 10px; font-size: 12px; }
+  .steg span { flex: 1; text-align: center; padding: 3px 0; border-radius: 12px; border: 1px solid var(--border); color: var(--text-dim); }
+  .steg span.nu { border-color: var(--accent); color: var(--text); font-weight: 600; }
+  .steg span.klar { border-color: var(--accent2); color: var(--accent2); }
+  .uppgift { margin-bottom: 8px; }
+  .ruta { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 8px; background: var(--bg3); font-size: 14px; }
+  .ruta b { font-weight: 600; }
+  .fraga { margin-top: 10px; }
+  .fraga .q { font-weight: 600; margin-bottom: 6px; }
+  .val { display: block; width: 100%; text-align: left; margin-bottom: 5px; padding: 6px 9px; background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13.5px; cursor: pointer; }
+  .val:hover:not(:disabled) { border-color: var(--accent); }
+  .val.ratt { border-color: var(--accent2); background: color-mix(in srgb, var(--accent2) 14%, var(--bg3)); }
+  .val.fel { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--bg3)); }
+  .val:disabled { cursor: default; }
+  .atergiv { font-size: 13.5px; margin: 0 0 8px; padding: 6px 9px; border-left: 3px solid var(--accent); background: var(--bg3); border-radius: 0 6px 6px 0; }
+  .grupp { margin-bottom: 14px; }
+  .grupp h3 { font-size: 14px; margin-bottom: 5px; font-weight: 600; }
+  .rad { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .lage-lista { display: flex; flex-direction: column; gap: 5px; }
+  .lage-lista .knapp { text-align: left; }
+  .lage-lista .knapp[aria-pressed="true"] { border-color: var(--accent); }
+
+  /* Högerpanel */
+  .flikar { display: flex; gap: 4px; margin-bottom: 10px; }
+  .flikar button { flex: 1; background: var(--bg3); color: var(--text-dim); border: 1px solid var(--border); border-radius: 6px; padding: 5px 0; font: inherit; font-size: 14px; cursor: pointer; }
+  .flikar button[aria-selected="true"] { color: var(--text); border-color: var(--accent); font-weight: 600; }
+  .komp-namn { font-size: 17px; font-weight: 600; }
+  .komp-typ { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); margin-bottom: 6px; }
+  .just-nu { font-family: var(--font-mono); font-size: 13px; padding: 5px 8px; background: var(--bg3); border-radius: 6px; margin: 8px 0; border: 1px solid var(--border); }
+  .reglage { margin: 10px 0; }
+  .reglage label { display: flex; justify-content: space-between; font-size: 14px; }
+  .reglage output { font-family: var(--font-mono); color: var(--accent); }
+  .reglage input[type=range] { width: 100%; accent-color: var(--accent); }
+  .reglage input:disabled { opacity: .5; }
+  .last { font-size: 13px; color: var(--text-dim); border-left: 3px solid var(--border); padding-left: 8px; margin-top: 10px; }
+  .slinga { border: 1px solid var(--border); border-left-width: 5px; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; background: var(--bg3); }
+  .slinga h3 { font-size: 14px; margin-bottom: 4px; }
+  .slinga .vag { font-size: 13px; line-height: 1.7; }
+  .slinga .vag b { color: var(--text); }
+  .slinga.k0 { border-left-color: var(--insulin); } .slinga.k1 { border-left-color: var(--glukagon); }
+  .slinga.k2 { border-left-color: var(--warm); } .slinga.k3 { border-left-color: var(--accent2); }
+  .tecken-pa { color: var(--accent2); font-weight: 700; } .tecken-av { color: var(--danger); font-weight: 700; }
+  .regel { font-size: 13px; margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: var(--bg); border: 1px dashed var(--border); }
+
+  dialog { background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; max-width: 520px; }
+  dialog::backdrop { background: var(--skymning); }
+  dialog h2 { font-size: 18px; margin-bottom: 8px; }
+  dialog ul { margin: 6px 0 12px 18px; } dialog li { margin-bottom: 4px; }
+  .sym { display: inline-block; vertical-align: middle; margin-right: 4px; }
+
+  @media (max-width: 1100px) {
+    body { height: auto; }
+    main { grid-template-columns: 1fr; grid-template-rows: auto; grid-template-areas: "m" "k" "h" "v"; }
+    .vanster { max-height: none; }
+    #krets { height: auto; aspect-ratio: 960 / 540; flex: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="hem-lank" href="../" title="Alla appar">← Alla appar</a>
+  <h1>Reglerverkstan</h1>
+  <label class="dim" for="valj-uppdrag">Uppdrag</label>
+  <select id="valj-uppdrag"></select>
+  <span class="styr" role="group" aria-label="Tid">
+    <button class="knapp primar" id="spela-knapp" type="button">▶ Start</button>
+    <button class="knapp" id="borja-om" type="button">↺ Börja om</button>
+    <span class="segment" id="fart" role="group" aria-label="Hastighet">
+      <button type="button" data-fart="3" aria-pressed="false">Långsam</button>
+      <button type="button" data-fart="6" aria-pressed="true">Normal</button>
+      <button type="button" data-fart="15" aria-pressed="false">Snabb</button>
+    </span>
+    <span class="tid" id="tid-rad"></span>
+  </span>
+  <button class="knapp" id="hjalp-knapp" type="button" style="margin-left:auto">Hjälp</button>
+  <button class="tema-knapp" id="tema-knapp" type="button" aria-label="Byt tema" title="Byt tema">
+    <svg class="ikon-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="ikon-mane" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z" fill="currentColor"/></svg>
+  </button>
+</header>
+
+<main>
+  <aside class="vanster">
+    <section class="panel" id="uppdrag-kort"></section>
+    <section class="panel" id="sandlada-kort" hidden></section>
+  </aside>
+
+  <section class="panel mitt">
+    <svg id="krets" viewBox="0 0 960 540" role="img" aria-label="Reglerkrets för blodsocker"></svg>
+  </section>
+
+  <aside class="panel hoger">
+    <div class="flikar" role="tablist">
+      <button type="button" role="tab" id="flik-komp-knapp" aria-selected="true">Komponent</button>
+      <button type="button" role="tab" id="flik-sling-knapp" aria-selected="false">Slingor</button>
+    </div>
+    <div id="flik-komp"></div>
+    <div id="flik-sling" hidden></div>
+  </aside>
+
+  <section class="panel kurvor">
+    <div class="kurv-rad">
+      <h2>Blodglukos (mmol/l)</h2>
+      <span class="forklaring"><i style="border-color:var(--glukos)"></i> modell</span>
+      <span class="forklaring" id="ford-frisk" hidden><i class="streck" style="border-color:var(--text-dim)"></i> frisk, samma händelser</span>
+      <span class="forklaring" id="ford-pred" hidden><i class="streck" style="border-color:var(--accent2)"></i> din förutsägelse</span>
+      <span class="dim" id="kurv-tips" style="margin-left:auto"></span>
+    </div>
+    <div id="kurv-g"></div>
+    <div id="kurv-h"></div>
+  </section>
+</main>
+
+<dialog id="hjalp">
+  <h2>Så fungerar Reglerverkstan</h2>
+  <ul>
+    <li><svg class="sym" width="14" height="14"><circle cx="7" cy="7" r="5" fill="var(--glukos)"/></svg> glukos &nbsp;
+        <svg class="sym" width="14" height="14"><rect x="3" y="3" width="8" height="8" fill="var(--insulin)" transform="rotate(45 7 7)"/></svg> insulin &nbsp;
+        <svg class="sym" width="14" height="14"><polygon points="7,1 13,12 1,12" fill="var(--glukagon)"/></svg> glukagon</li>
+    <li><b>+</b> på en pil: mer av det ena ger mer av det andra. <b>−</b>: mer av det ena ger mindre av det andra.</li>
+    <li>Klicka på en komponent i kretsen för att läsa om den. I Sandlådan går den att ändra med reglage.</li>
+    <li>Dra i kurvorna för att bläddra i tiden. Mellanslag startar och pausar, pilarna stegar.</li>
+    <li>I uppdragen ritar du först en förutsägelse i blodglukoskurvan.</li>
+  </ul>
+  <p class="dim">Förenklad modell för att visa principen, inte mätdata och inte råd om behandling. Kroppen har fler hormoner och reserver än de som visas här.</p>
+  <p style="margin-top:12px"><button class="knapp primar" id="hjalp-stang" type="button">Stäng</button></p>
+</dialog>
+
+<script>
+'use strict';
+
+/* =========================================================================
+   Hjälpfunktioner
+   ========================================================================= */
+const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace('.', ',').replace('-', '−');
+const klamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+/* =========================================================================
+   Tema
+   ========================================================================= */
+const Tema = (() => {
+  const NYCKEL = 'kemiappar-tema';
+  function init() {
+    document.getElementById('tema-knapp').addEventListener('click', () => {
+      const t = document.documentElement.dataset.tema === 'ljust' ? 'morkt' : 'ljust';
+      document.documentElement.dataset.tema = t;
+      try { localStorage.setItem(NYCKEL, t); } catch (e) {}
+    });
+  }
+  return { init };
+})();
+
+/* =========================================================================
+   Motor: ren modell utan DOM. Ett system är en lista komponenter
+   (storhet, sensor, signal, effektor, störning) med parametrar. Motorn
+   räknar ut förloppet, och härleder återkopplingsslingorna ur kopplingarna.
+   ========================================================================= */
+const Motor = (() => {
+  const sig = x => 1 / (1 + Math.exp(-x));
+  const typ = (def, t) => def.noder.filter(n => n.typ === t);
+
+  function grundpar(def) {
+    const P = {};
+    for (const n of def.noder) P[n.id] = Object.assign({}, n.par || {});
+    return P;
+  }
+  function satt(P, nyckel, v) { const [a, b] = nyckel.split('.'); P[a][b] = v; }
+
+  // Parametrar vid tiden t: startvärden plus ändringar fram till t.
+  function parVid(def, start, hand, t) {
+    const P = grundpar(def);
+    for (const k in (start || {})) satt(P, k, start[k]);
+    for (const e of hand.slice().sort((a, b) => a.t - b.t)) if (e.typ === 'par' && e.t <= t + 1e-9) satt(P, e.nyckel, e.varde);
+    return P;
+  }
+
+  // opt: { start, hand, langd }. Returnerar serier per komponent-id.
+  function kor(def, opt) {
+    const dt = def.dt, langd = opt.langd, N = Math.round(langd / dt);
+    const P = grundpar(def);
+    for (const k in (opt.start || {})) satt(P, k, opt.start[k]);
+    const storheter = typ(def, 'storhet'), sensorer = typ(def, 'sensor'), signaler = typ(def, 'signal');
+    const effektorer = typ(def, 'effektor'), stornings = typ(def, 'storning');
+
+    const X = {}, H = {}, D = {}, POOL = {}, belast = {};
+    for (const s of storheter) X[s.id] = s.start;
+    const akt = s => P[s.id].funk * sig(P[s.id].dir * (X[s.mot] - P[s.id].trosk) / P[s.id].bredd);
+    for (const sg of signaler) { H[sg.id] = akt(def.noder.find(n => n.id === sg.fran)); D[sg.id] = 0; }
+    for (const st of stornings) POOL[st.id] = 0;
+
+    const ser = {};
+    for (const n of def.noder) ser[n.id] = new Float32Array(N + 1);
+    for (const ef of effektorer) ser['oppen:' + ef.id] = new Float32Array(N + 1);
+    for (const st of stornings) ser['pool:' + st.id] = new Float32Array(N + 1);
+
+    function steg(t, i) {
+      const a = {}, e = {};
+      for (const s of sensorer) a[s.id] = akt(s);
+      for (const sg of signaler) {
+        const dos = D[sg.id] / P[sg.id].tau;
+        D[sg.id] = Math.max(0, D[sg.id] - dt * dos);
+        H[sg.id] += dt * (a[sg.fran] - H[sg.id]) / P[sg.id].fordr;
+        e[sg.id] = H[sg.id] + dos;
+      }
+      const dX = {}; for (const id in X) dX[id] = 0;
+      const rate = {}, oppen = {};
+      for (const ef of effektorer) {
+        const p = P[ef.id];
+        const h = ef.signal ? Math.min(e[ef.signal], 2) : 0;
+        const bas = ef.signal ? p.bas : 1;
+        const rec = p.rec === undefined ? 1 : p.rec;
+        const sub = ef.fran ? X[ef.fran] / (X[ef.fran] + p.km) : 1;
+        const b = belast[ef.id], mul = b && t < b.till ? b.faktor : 1;
+        oppen[ef.id] = rec * (bas + (1 - bas) * h) * mul;
+        rate[ef.id] = p.kap * oppen[ef.id] * sub;
+        if (ef.fran) dX[ef.fran] -= rate[ef.id];
+        if (ef.till) dX[ef.till] += rate[ef.id];
+      }
+      const ab = {};
+      for (const st of stornings) {
+        ab[st.id] = P[st.id].kabs * POOL[st.id];
+        dX[st.till] += ab[st.id];
+      }
+      if (i >= 0) {
+        for (const s of storheter) ser[s.id][i] = X[s.id];
+        for (const s of sensorer) ser[s.id][i] = a[s.id];
+        for (const sg of signaler) ser[sg.id][i] = e[sg.id];
+        for (const ef of effektorer) { ser[ef.id][i] = rate[ef.id]; ser['oppen:' + ef.id][i] = oppen[ef.id]; }
+        for (const st of stornings) { ser[st.id][i] = ab[st.id]; ser['pool:' + st.id][i] = POOL[st.id]; }
+      }
+      for (const id in X) X[id] = Math.max(0, X[id] + dt * dX[id]);
+      for (const st of stornings) POOL[st.id] = Math.max(0, POOL[st.id] - dt * ab[st.id]);
+    }
+
+    // Förkörning så att kurvan börjar i systemets eget jämviktsläge.
+    for (let k = 0; k < 600; k++) steg(-1, -1);
+    for (const s of storheter) if (s.aterstall) X[s.id] = s.start;
+    for (const st of stornings) POOL[st.id] = 0;
+    for (const sg of signaler) D[sg.id] = 0;
+
+    const ev = (opt.hand || []).slice().sort((a, b) => a.t - b.t);
+    let ei = 0;
+    for (let i = 0; i <= N; i++) {
+      const t = i * dt;
+      while (ei < ev.length && ev[ei].t <= t + 1e-9) {
+        const e = ev[ei++];
+        if (e.typ === 'maltid') POOL[e.mal || stornings[0].id] += e.storlek;
+        else if (e.typ === 'dos') D[e.mal || 'insulin'] += e.storlek;
+        else if (e.typ === 'motion') belast[e.mal || 'forb'] = { faktor: e.faktor, till: t + e.langd };
+        else if (e.typ === 'par') satt(P, e.nyckel, e.varde);
+      }
+      steg(t, i);
+    }
+    return { dt, langd, n: N, ser };
+  }
+
+  // Kopplingar mellan komponenterna, med tecken: + mer ger mer, − mer ger mindre.
+  function kanter(def, P) {
+    const K = [];
+    const k = (fran, till, tecken, art) => K.push({ id: fran + '>' + till, fran, till, tecken, art });
+    for (const n of def.noder) {
+      if (n.typ === 'sensor') k(n.mot, n.id, P[n.id].dir >= 0 ? 1 : -1, 'avkanning');
+      else if (n.typ === 'signal') k(n.fran, n.id, 1, 'signal');
+      else if (n.typ === 'effektor') {
+        if (n.signal) k(n.signal, n.id, 1, 'signal');
+        if (n.till) k(n.id, n.till, 1, 'flode');
+        if (n.fran) k(n.id, n.fran, -1, 'flode');
+      } else if (n.typ === 'storning') k(n.id, n.till, 1, 'flode');
+    }
+    return K;
+  }
+
+  // Alla slingor (slutna kretsar) i kopplingsgrafen. Slingans tecken är
+  // produkten av tecknen: udda antal minus ger negativ återkoppling.
+  function slingor(def, P) {
+    const K = kanter(def, P), ut = {}, idx = {}, res = [];
+    for (const k of K) (ut[k.fran] = ut[k.fran] || []).push(k);
+    def.noder.forEach((n, i) => { idx[n.id] = i; });
+    for (const start of def.noder) {
+      const stack = [], besokt = new Set();
+      const dfs = nod => {
+        for (const k of (ut[nod] || [])) {
+          if (k.till === start.id) res.push([...stack, k]);
+          else if (idx[k.till] > idx[start.id] && !besokt.has(k.till)) {
+            besokt.add(k.till); stack.push(k); dfs(k.till); stack.pop(); besokt.delete(k.till);
+          }
+        }
+      };
+      dfs(start.id);
+    }
+    const nod = id => def.noder.find(n => n.id === id);
+    return res.map(kanter_ => {
+      const minus = kanter_.filter(k => k.tecken < 0).length;
+      const ids = kanter_.map(k => k.fran);
+      const sista = kanter_[kanter_.length - 1];
+      return {
+        kanter: kanter_, noder: ids, minus,
+        tecken: minus % 2 ? -1 : 1,
+        typ: minus % 2 ? 'negativ' : 'positiv',
+        storhet: ids.find(id => nod(id).typ === 'storhet'),
+        effektor: ids.find(id => nod(id).typ === 'effektor'),
+        paverkan: sista.tecken,
+      };
+    });
+  }
+
+  // Slingor som verkar åt motsatt håll på samma storhet.
+  function tavlande(lista) {
+    const per = {};
+    // Bara negativa slingor reglerar; en skenande slinga är ingen tävlande väg.
+    lista.forEach((s, i) => { if (s.typ === 'negativ') (per[s.storhet] = per[s.storhet] || []).push(i); });
+    const ut = [];
+    for (const st in per) {
+      const g = per[st];
+      const upp = g.filter(i => lista[i].paverkan > 0), ner = g.filter(i => lista[i].paverkan < 0);
+      if (upp.length && ner.length) ut.push({ storhet: st, hoja: upp, sanka: ner });
+    }
+    return ut;
+  }
+
+  return { kor, parVid, kanter, slingor, tavlande, grundpar };
+})();
+
+/* =========================================================================
+   System: blodsockerreglering. Värdena är en kvalitativ modell, inte mätdata.
+   ========================================================================= */
+const BLODSOCKER = {
+  id: 'blodsocker', namn: 'Blodsockerreglering', dt: 0.5,
+  noder: [
+    { id: 'mage', typ: 'storning', namn: 'Mage och tarm', till: 'G', par: { kabs: 0.03 } },
+    { id: 'G', typ: 'storhet', namn: 'Glukos i blodet', start: 5 },
+    { id: 'F', typ: 'storhet', namn: 'Förråd av glukos', start: 60, aterstall: true },
+    { id: 'beta', typ: 'sensor', namn: 'Betaceller', mot: 'G', par: { funk: 1, trosk: 6, bredd: 0.9, dir: 1 } },
+    { id: 'alfa', typ: 'sensor', namn: 'Alfaceller', mot: 'G', par: { funk: 1, trosk: 4.2, bredd: 0.5, dir: -1 } },
+    { id: 'insulin', typ: 'signal', namn: 'Insulin', fran: 'beta', par: { fordr: 12, tau: 60 } },
+    { id: 'glukagon', typ: 'signal', namn: 'Glukagon', fran: 'alfa', par: { fordr: 10, tau: 60 } },
+    { id: 'upptag', typ: 'effektor', namn: 'Upptag i cellerna', fran: 'G', till: 'F', signal: 'insulin', par: { kap: 0.6, rec: 1, bas: 0.25, km: 3 } },
+    { id: 'friset', typ: 'effektor', namn: 'Frisättning från levern', fran: 'F', till: 'G', signal: 'glukagon', par: { kap: 0.38, bas: 0.5, km: 10 } },
+    { id: 'forb', typ: 'effektor', namn: 'Förbrukning', fran: 'G', till: null, signal: null, par: { kap: 0.048, km: 3 } },
+  ],
+};
+
+// Vad eleven får veta om varje komponent, och vilka reglage som finns.
+const KOMPONENT = {
+  G: { slag: 'Storhet', text: 'Glukoshalten i blodet. Den streckade linjen är börvärdet, och det grönskimrande bandet är det normala området.' },
+  F: { slag: 'Förråd', text: 'Glykogen och fett. Förrådet fylls när glukos tas upp och töms när levern släpper ut glukos.' },
+  mage: { slag: 'Störning', text: 'Maten bryts ner och glukosen tas upp från tarmen till blodet, under en dryg timme.' },
+  forb: { slag: 'Effektor', text: 'Hjärnan och övriga organ förbrukar glukos hela tiden. Motion ökar förbrukningen i musklerna.',
+    reglage: [{ nyckel: 'kap', etikett: 'Förbrukning', min: 0, max: 200, enhet: '%', skala: 0.048 }] },
+  beta: { slag: 'Sensor', text: 'Celler i bukspottkörteln som känner av glukoshalten i blodet och styr insulinet.',
+    reglage: [
+      { nyckel: 'funk', etikett: 'Fungerande celler', min: 0, max: 100, enhet: '%', skala: 1 },
+      { nyckel: 'trosk', etikett: 'Tröskel', min: 3, max: 9, steg: 0.1, enhet: 'mmol/l', skala: null },
+      { nyckel: 'dir', etikett: 'Svarar på', val: [[1, 'hög glukos'], [-1, 'låg glukos']] },
+    ] },
+  alfa: { slag: 'Sensor', text: 'Celler i bukspottkörteln som känner av glukoshalten i blodet och styr glukagonet.',
+    reglage: [
+      { nyckel: 'funk', etikett: 'Fungerande celler', min: 0, max: 100, enhet: '%', skala: 1 },
+      { nyckel: 'trosk', etikett: 'Tröskel', min: 2.5, max: 6, steg: 0.1, enhet: 'mmol/l', skala: null },
+    ] },
+  insulin: { slag: 'Signalämne', text: 'Hormon som färdas med blodet till cellerna och öppnar för upptag av glukos.',
+    reglage: [{ nyckel: 'fordr', etikett: 'Fördröjning', min: 2, max: 40, enhet: 'min', skala: null }] },
+  glukagon: { slag: 'Signalämne', text: 'Hormon som färdas med blodet till levern och får den att släppa ut glukos.',
+    reglage: [{ nyckel: 'fordr', etikett: 'Fördröjning', min: 2, max: 40, enhet: 'min', skala: null }] },
+  upptag: { slag: 'Effektor', text: 'Celler i muskler, fett och lever tar upp glukos till förrådet. Receptorerna avgör hur mycket insulinet kan öppna.',
+    reglage: [
+      { nyckel: 'kap', etikett: 'Kapacitet', min: 0, max: 150, enhet: '%', skala: 0.6 },
+      { nyckel: 'rec', etikett: 'Receptorer', min: 0, max: 100, enhet: '%', skala: 1 },
+    ] },
+  friset: { slag: 'Effektor', text: 'Levern bryter ner glykogen från förrådet och släpper ut glukos i blodet.',
+    reglage: [{ nyckel: 'kap', etikett: 'Kapacitet', min: 0, max: 150, enhet: '%', skala: 0.38 }] },
+};
+
+const LAGEN = [
+  { id: 'frisk', namn: 'Frisk', par: { 'beta.funk': 1, 'beta.dir': 1, 'alfa.funk': 1, 'upptag.rec': 1 } },
+  { id: 'typ1', namn: 'Typ 1: betacellerna förstörda', par: { 'beta.funk': 0 } },
+  { id: 'typ2', namn: 'Typ 2: få receptorer', par: { 'upptag.rec': 0.3 } },
+  { id: 'utanglukagon', namn: 'Glukagonvägen bortkopplad', par: { 'alfa.funk': 0 } },
+  { id: 'vand', namn: 'Insulinsignalen vänd', par: { 'beta.dir': -1 } },
+];
+
+/* =========================================================================
+   Uppdrag. Förutsäg, observera, förklara. Alla felalternativ är
+   missuppfattningar; alternativen har jämförbar längd (se DIDAKTIK.md).
+   ========================================================================= */
+const MALTID = { t: 30, typ: 'maltid', storlek: 10 };
+const UPPDRAG = [
+  { id: 'maltid', rubrik: '1. En måltid', start: {}, hand: [MALTID], langd: 240, ymax: 12, matt: 'topp',
+    uppgift: 'Rita hur blodsockret ändras efter måltiden. Tryck sedan på Start.',
+    fraga: { q: 'Vad händer med glukosen när blodsockret går ner igen?', val: [
+      { ratt: true, t: 'Insulinet får cellerna att ta upp glukos ur blodet och lagra den i förrådet.',
+        svar: 'Glukosen flyttas till förrådet. När halten närmar sig börvärdet minskar insulinet och upptaget avtar: effekten hämmar sin egen orsak. Det är negativ återkoppling.' },
+      { t: 'Insulinet bryter ner glukosen i blodet så att den försvinner helt ur kroppen.',
+        svar: 'Glukosen försvinner inte. Den flyttas från blodet till förrådet. Titta på förrådets nivå i kretsen.' },
+      { t: 'Glukagonet får cellerna att ta upp glukos ur blodet och lagra den i förrådet.',
+        svar: 'Det är insulinet som öppnar för upptaget. Glukagonet verkar åt andra hållet och får levern att släppa ut glukos.' },
+      { t: 'Överskottet lämnar kroppen med urinen så fort halten har passerat börvärdet.',
+        svar: 'Vid friska värden lämnar ingen glukos kroppen med urinen. Överskottet lagras i förrådet.' },
+    ] } },
+  { id: 'typ1', rubrik: '2. Insulinet saknas', start: { 'beta.funk': 0 }, hand: [MALTID], langd: 300, ymax: 22, matt: 'topp',
+    uppgift: 'Betacellerna är förstörda, som vid typ 1-diabetes. Rita hur blodsockret ändras efter samma måltid.',
+    fraga: { q: 'Varför blir blodsockret kvar högt utan insulin?', val: [
+      { ratt: true, t: 'Utan insulin tar cellerna inte upp glukos, så att den blir kvar i blodet.',
+        svar: 'Ventilen för upptag förblir nästan stängd. Glukosen kan inte lämna blodet och förrådet fylls inte på.' },
+      { t: 'Glukagonet ökar när blodsockret är högt, så att levern släpper ut mer glukos.',
+        svar: 'I modellen bromsas glukagonet av högt blodsocker (se hormonkurvan). Insulinbristen förklarar kurvan ensam.' },
+      { t: 'Insulinet bryter ner glukos i blodet, så att halten stannar högt utan det.',
+        svar: 'Insulinet bryter inte ner glukos. Det öppnar för upptag i cellerna, och utan det är ventilen stängd.' },
+      { t: 'Tarmen fortsätter ta upp glukos när insulin saknas, så att halten stiger.',
+        svar: 'Upptaget från tarmen styrs inte av insulin och är klart efter en stund. Det uteblivna upptaget i cellerna håller halten uppe.' },
+    ] } },
+  { id: 'typ2', rubrik: '3. Cellerna svarar dåligt', start: { 'upptag.rec': 0.3 }, hand: [MALTID], langd: 300, ymax: 18, matt: 'topp',
+    uppgift: 'Insulin bildas, men cellerna har få receptorer, som vid typ 2-diabetes. Rita hur blodsockret ändras efter samma måltid.',
+    fraga: { q: 'Varför går blodsockret ner långsammare när cellerna svarar dåligt?', val: [
+      { ratt: true, t: 'Insulin finns, men färre receptorer gör att upptaget i cellerna går långsamt.',
+        svar: 'Insulinkurvan är högre än hos en frisk, men ventilen öppnas ändå mindre. Betacellerna kompenserar men hinner inte ikapp.' },
+      { t: 'Bukspottkörteln har slutat bilda insulin, så att cellerna inte kan ta upp glukos.',
+        svar: 'Det är typ 1. Här bildas insulin (se insulinkurvan), men cellerna svarar svagare.' },
+      { t: 'Cellerna har redan tillräckligt med glukos, så att de inte tar upp mer av den.',
+        svar: 'Förrådet är långt ifrån fullt. Upptaget är lågt för att färre receptorer fångar upp insulinsignalen.' },
+      { t: 'Insulinet bryts ner för snabbt, så att det aldrig hinner verka på cellerna.',
+        svar: 'Insulinet bryts ner lika snabbt som hos en frisk. Det är receptorerna som är färre, inte insulinet som är kortlivat.' },
+    ] } },
+  { id: 'glukagon', rubrik: '4. Insulin utan glukagon', start: { 'alfa.funk': 0 }, hand: [{ t: 30, typ: 'dos', storlek: 60 }], langd: 240, ymax: 8, matt: 'botten',
+    uppgift: 'Experiment: en dos insulin ges utan måltid, och glukagonvägen är bortkopplad. Rita hur lågt blodsockret går.',
+    fraga: { q: 'Vad gör glukagonet när blodsockret sjunker under börvärdet?', val: [
+      { ratt: true, t: 'Det får levern att bryta ner glykogen och släppa ut glukos i blodet.',
+        svar: 'Glukagonvägen och insulinvägen verkar åt motsatt håll på samma storhet. Därför hindrar glukagonet att blodsockret sjunker för djupt.' },
+      { t: 'Det får cellerna att ta upp mer glukos, så att insulinet behövs mindre.',
+        svar: 'Då skulle blodsockret sjunka ännu mer. Glukagonet verkar åt motsatt håll mot insulinet.' },
+      { t: 'Det får bukspottkörteln att bilda mer insulin, så att förbrukningen minskar.',
+        svar: 'Insulin sänker blodsockret och skulle förvärra läget. Hormonerna bildas i olika celler och har motsatt verkan.' },
+      { t: 'Det får hjärnan att sluta förbruka glukos, så att halten stiger av sig själv.',
+        svar: 'Hjärnan förbrukar glukos hela tiden (utflödet i kretsen). Det är levern som måste släppa ut mer.' },
+    ] } },
+  { id: 'vand', rubrik: '5. Tecknet vänds', start: {}, hand: [{ t: 20, typ: 'par', nyckel: 'beta.dir', varde: -1 }, MALTID], langd: 300, ymax: 12, matt: 'topp',
+    uppgift: 'Vid 20 min vänds betacellernas svar: hög glukos ger mindre insulin. Rita hur blodsockret ändras efter måltiden.',
+    fraga: { q: 'Varför går blodsockret inte tillbaka efter måltiden?', val: [
+      { ratt: true, t: 'Ändringen förstärker sig själv: hög glukos ger mindre insulin och ännu högre glukos.',
+        svar: 'Slingan har nu två minustecken, ett jämnt antal, så ändringen driver sig själv vidare. Det är positiv återkoppling. Räkna minustecknen i fliken Slingor.' },
+      { t: 'Insulinförrådet i betacellerna har tagit slut, så att inget insulin kan frisättas.',
+        svar: 'Betacellerna fungerar. Det är signalen som vänts: hög glukos ger mindre insulin (se insulinkurvan).' },
+      { t: 'Glukagonet ökar när blodsockret är högt, så att levern släpper ut mer glukos.',
+        svar: 'Glukagonvägen är oförändrad och bromsas fortfarande av högt blodsocker. Det är insulinvägen som vänts.' },
+      { t: 'Cellerna blir mättade av glukos, så att de inte kan ta upp mer från blodet.',
+        svar: 'Förrådet är långt ifrån fullt. Upptaget uteblir för att insulinet sjunker när blodsockret stiger.' },
+    ] } },
+  { id: 'sandlada', rubrik: 'Sandlådan', fri: true, start: {}, hand: [], langd: 480, ymax: 22,
+    uppgift: 'Gör egna experiment. Klicka på komponenter i kretsen och ändra dem med reglagen.' },
+];
+
+const LASTNOT = 'Låst i uppdraget. Sandlådan har reglage.';
+
+/* =========================================================================
+   Vy: kretsen som SVG, med flödande partiklar. Ritas en gång; varje bildruta
+   uppdateras bara nivåer, ventiler och partiklar.
+   ========================================================================= */
+const Vy = (() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const E = (tag, a, p) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in (a || {})) e.setAttribute(k, a[k]);
+    if (p) p.appendChild(e);
+    return e;
+  };
+  const T = (txt, a, p) => { const e = E('text', a, p); e.textContent = txt; return e; };
+
+  const TANK = { x: 290, y: 160, b: 380, h: 170, max: 16 };
+  const BOTTEN = TANK.y + TANK.h;
+  const yG = g => BOTTEN - TANK.h * klamp(g, 0, TANK.max) / TANK.max;
+  const STORE = { x: 330, y: 430, b: 300, h: 90 };
+  const MAGE = { x: 20, y: 190, b: 130, h: 100 };
+  const FORB = { x: 810, y: 250, b: 130, h: 100 };
+
+  // Banor som partiklarna följer, och rören som ritas under dem.
+  const BANOR = {
+    mage: 'M150,240 H330 V282', forb: 'M640,300 H810', upptag: 'M360,300 V440', friset: 'M600,440 V300',
+    insulin: 'M430,98 V382 H378', glukagon: 'M530,98 V382 H582',
+  };
+  const ROR = { mage: 'M150,240 H318', forb: 'M652,300 H810', upptag: 'M360,330 V430', friset: 'M600,430 V330' };
+  // Kopplingar som kan lysas upp när slingorna visas.
+  const KANT_D = {
+    'G>beta': 'M400,160 V116', 'G>alfa': 'M560,160 V116',
+    'beta>insulin': 'M430,98 V338', 'alfa>glukagon': 'M530,98 V338',
+    'insulin>upptag': 'M430,362 V382 H378', 'glukagon>friset': 'M530,362 V382 H582',
+    'upptag>G': 'M372,368 V312', 'friset>G': 'M588,368 V312',
+  };
+  const BADGE = {
+    'G>beta': [400, 138], 'G>alfa': [560, 138], 'beta>insulin': [430, 215], 'alfa>glukagon': [530, 215],
+    'insulin>upptag': [404, 382], 'glukagon>friset': [556, 382], 'upptag>G': [392, 318], 'friset>G': [566, 318],
+  };
+  const SYNLIGA = new Set(['G>beta', 'G>alfa']);  // visas alltid; övriga bara när slingorna visas
+
+  let R = {}, partiklar = [], sampel = {}, ack = {}, prickar = [], P = null, slingorNu = [];
+
+  function ror(g, d) { E('path', { d, class: 'ror-ut' }, g); E('path', { d, class: 'ror-in' }, g); }
+
+  function nod(g, id, namn, ram) {
+    const n = E('g', { class: 'nod', 'data-nod': id, tabindex: 0, role: 'button', 'aria-label': namn }, g);
+    E('rect', Object.assign({ class: 'ram' }, ram), n);
+    return n;
+  }
+
+  function bygg(svg) {
+    svg.innerHTML = '';
+    R = { svg }; partiklar = []; prickar = []; ack = {};
+    const defs = E('defs', {}, svg);
+    const kl = E('clipPath', { id: 'klipp-tank' }, defs);
+    E('rect', { x: TANK.x + 2, y: TANK.y + 2, width: TANK.b - 4, height: TANK.h - 4 }, kl);
+
+    // Bukspottkörteln
+    E('rect', { x: 330, y: 30, width: 300, height: 96, rx: 40, class: 'pankreas' }, svg);
+    T('BUKSPOTTKÖRTELN', { x: 480, y: 22, 'text-anchor': 'middle', 'font-size': 13, class: 't-dim' }, svg);
+
+    // Ledningar (avkänning och hormoner), under cellerna
+    const led = E('g', {}, svg);
+    E('path', { d: KANT_D['G>beta'], class: 'led avkann' }, led);
+    E('path', { d: KANT_D['G>alfa'], class: 'led avkann' }, led);
+    E('path', { d: BANOR.insulin, class: 'led insulin' }, led);
+    E('path', { d: BANOR.glukagon, class: 'led glukagon' }, led);
+
+    // Blodtanken
+    const tank = nod(svg, 'G', 'Glukos i blodet', { x: TANK.x - 6, y: TANK.y - 6, width: TANK.b + 12, height: TANK.h + 12 });
+    E('rect', { x: TANK.x, y: TANK.y, width: TANK.b, height: TANK.h, rx: 8, class: 'vagg' }, tank);
+    const inre = E('g', { 'clip-path': 'url(#klipp-tank)' }, tank);
+    R.band = E('rect', { x: TANK.x, y: yG(6), width: TANK.b, height: yG(4) - yG(6), class: 'band' }, inre);
+    R.vatska = E('rect', { x: TANK.x, class: 'vatska' }, inre);
+    R.yta = E('line', { x1: TANK.x, x2: TANK.x + TANK.b, class: 'vatska-yta' }, inre);
+    R.prickGrp = E('g', {}, inre);
+    R.bord = E('line', { x1: TANK.x, x2: TANK.x + TANK.b, y1: yG(5), y2: yG(5), class: 'bord' }, tank);
+    E('rect', { x: TANK.x, y: TANK.y, width: TANK.b, height: TANK.h, rx: 8, class: 'tank-ram' }, tank);
+    T('börvärde', { x: TANK.x + 8, y: yG(6) - 5, 'font-size': 13, class: 't-dim' }, tank);
+    for (const v of [5, 10, 15]) {
+      E('line', { x1: TANK.x + TANK.b - 12, x2: TANK.x + TANK.b, y1: yG(v), y2: yG(v), stroke: 'var(--text-dim)', 'stroke-width': 1.5 }, tank);
+      T(String(v), { x: TANK.x + TANK.b - 16, y: yG(v) + 4, 'text-anchor': 'end', 'font-size': 12, class: 't-dim' }, tank);
+    }
+    T('Glukos i blodet', { x: TANK.x + 10, y: TANK.y + 22, 'font-size': 14, class: 't-dim' }, tank);
+    R.gtext = T('', { x: TANK.x + 10, y: TANK.y + 50, 'font-size': 26, class: 't-fet' }, tank);
+    R.over = T('▲ över skalan', { x: TANK.x + TANK.b - 10, y: TANK.y + 22, 'text-anchor': 'end', 'font-size': 13, class: 't-fet', opacity: 0 }, tank);
+    R.over.style.fill = 'var(--danger)';
+    R.gtext2 = T('mmol/l', { x: TANK.x + 10, y: TANK.y + 50, 'font-size': 13, class: 't-dim' }, tank);
+
+    // Mage och tarm, hjärna och förråd
+    const mage = nod(svg, 'mage', 'Mage och tarm', { x: MAGE.x - 5, y: MAGE.y - 5, width: MAGE.b + 10, height: MAGE.h + 10 });
+    E('rect', { x: MAGE.x, y: MAGE.y, width: MAGE.b, height: MAGE.h, rx: 12, class: 'box' }, mage);
+    R.matFyll = E('rect', { x: MAGE.x + 2, width: MAGE.b - 4, class: 'fyll' }, mage);
+    T('Mage och tarm', { x: MAGE.x + MAGE.b / 2, y: MAGE.y + 22, 'text-anchor': 'middle', 'font-size': 15, class: 'box-text' }, mage);
+    const forb = nod(svg, 'forb', 'Hjärna, muskler och övriga organ', { x: FORB.x - 5, y: FORB.y - 5, width: FORB.b + 10, height: FORB.h + 10 });
+    E('rect', { x: FORB.x, y: FORB.y, width: FORB.b, height: FORB.h, rx: 12, class: 'box' }, forb);
+    T('Hjärna, muskler', { x: FORB.x + FORB.b / 2, y: FORB.y + 40, 'text-anchor': 'middle', 'font-size': 15 }, forb);
+    T('och övriga organ', { x: FORB.x + FORB.b / 2, y: FORB.y + 60, 'text-anchor': 'middle', 'font-size': 15 }, forb);
+    const forr = nod(svg, 'F', 'Förråd av glukos', { x: STORE.x - 5, y: STORE.y - 5, width: STORE.b + 10, height: STORE.h + 10 });
+    E('rect', { x: STORE.x, y: STORE.y, width: STORE.b, height: STORE.h, rx: 12, class: 'box' }, forr);
+    R.forrFyll = E('rect', { x: STORE.x + 2, width: STORE.b - 4, class: 'fyll' }, forr);
+    T('Förråd', { x: STORE.x + 14, y: STORE.y + 28, 'font-size': 18, class: 't-fet box-text' }, forr);
+    T('glykogen och fett', { x: STORE.x + 14, y: STORE.y + 48, 'font-size': 14, class: 't-dim box-text' }, forr);
+
+    // Rör (ritas över tankens kant)
+    const rg = E('g', {}, svg);
+    for (const k in ROR) ror(rg, ROR[k]);
+
+    // Betaceller och alfaceller
+    R.cell = {};
+    for (const [id, cx, namn] of [['beta', 400, 'Betaceller'], ['alfa', 560, 'Alfaceller']]) {
+      const g = nod(svg, id, namn, { x: cx - 52, y: 40, width: 104, height: 84 });
+      R['glod_' + id] = E('circle', { cx, cy: 86, r: 38, class: 'glod ' + id, opacity: 0 }, g);
+      T(namn, { x: cx, y: 56, 'text-anchor': 'middle', 'font-size': 14, class: 't-fet' }, g);
+      R.cell[id] = [];
+      for (let k = 0; k < 5; k++) {
+        const a = -Math.PI / 2 + k * 2 * Math.PI / 5;
+        R.cell[id].push(E('circle', { cx: cx + 17 * Math.cos(a), cy: 90 + 17 * Math.sin(a), r: 10, class: 'cell ' + id }, g));
+      }
+    }
+
+    // Signalämnen (chips på ledningarna)
+    R.chip = {};
+    for (const [id, cx, namn] of [['insulin', 430, 'Insulin'], ['glukagon', 530, 'Glukagon']]) {
+      const g = nod(svg, id, namn, { x: cx - 46, y: 332, width: 92, height: 36 });
+      E('rect', { x: cx - 40, y: 338, width: 80, height: 24, rx: 12, class: 'chip ' + id }, g);
+      R.chip[id] = E('rect', { x: cx - 40, y: 338, height: 24, rx: 12, class: 'mat ' + id, width: 0 }, g);
+      T(namn, { x: cx, y: 354, 'text-anchor': 'middle', 'font-size': 14, class: 'box-text' }, g);
+      R.chip[id].cx = cx;
+    }
+
+    // Ventiler
+    R.ventil = {}; R.recept = [];
+    for (const [id, vx, namn, sido] of [['upptag', 360, 'Upptag i cellerna', 'l'], ['friset', 600, 'Frisättning från levern', 'r']]) {
+      const g = nod(svg, id, namn, sido === 'l' ? { x: vx - 112, y: 346, width: 144, height: 82 } : { x: vx - 32, y: 346, width: 150, height: 82 });
+      const v = E('g', { transform: `translate(${vx},382)` }, g);
+      E('circle', { r: 15, class: 'ventil' }, v);
+      R.ventil[id] = E('line', { x1: 0, y1: -11, x2: 0, y2: 11, class: 'ventilstav' }, v);
+      if (sido === 'l') {
+        T('Upptag', { x: vx - 36, y: 436 - 22, 'text-anchor': 'end', 'font-size': 14, class: 't-fet' }, g);
+        T('i cellerna', { x: vx - 36, y: 436 - 6, 'text-anchor': 'end', 'font-size': 13, class: 't-dim' }, g);
+        for (const [px, py, rot] of [[vx - 17, 352, -90], [vx - 17, 408, -90], [vx + 17, 352, 90], [vx + 17, 408, 90]]) {
+          R.recept.push(E('path', { d: 'M0,0 V6 M0,6 L-4,0 M0,6 L4,0', class: 'recept', transform: `translate(${px},${py}) rotate(${rot}) scale(1.5)` }, g));
+        }
+      } else {
+        T('Frisättning', { x: vx + 36, y: 436 - 22, 'font-size': 14, class: 't-fet' }, g);
+        T('från levern', { x: vx + 36, y: 436 - 6, 'font-size': 13, class: 't-dim' }, g);
+      }
+    }
+
+    // Kopplingar som lyser upp i slingvyn, och tecken
+    R.kant = {};
+    const kg = E('g', { 'pointer-events': 'none' }, svg);
+    for (const k in KANT_D) R.kant[k] = E('path', { d: KANT_D[k], class: 'kant' }, kg);
+    R.badge = {};
+    const bg = E('g', { 'pointer-events': 'none' }, svg);
+    for (const k in BADGE) {
+      const g = E('g', { class: 'badge dold', transform: `translate(${BADGE[k][0]},${BADGE[k][1]})` }, bg);
+      E('circle', { r: 11 }, g); T('+', {}, g);
+      R.badge[k] = g;
+    }
+    R.tagg = [T('', { x: 322, y: 80, 'text-anchor': 'end', class: 'tagg' }, svg), T('', { x: 638, y: 80, class: 'tagg' }, svg)];
+
+    // Partiklar ovanpå
+    R.partGrp = E('g', { 'pointer-events': 'none' }, svg);
+
+    // Teckenförklaring
+    const lg = E('g', { transform: 'translate(20,432)' }, svg);
+    E('circle', { cx: 8, cy: 8, r: 5, class: 'p-glukos' }, lg); T('glukos', { x: 22, y: 13, 'font-size': 13, class: 't-dim' }, lg);
+    E('rect', { x: 4, y: 28, width: 8, height: 8, class: 'p-insulin', transform: 'rotate(45 8 32)' }, lg); T('insulin', { x: 22, y: 37, 'font-size': 13, class: 't-dim' }, lg);
+    E('polygon', { points: '8,50 14,61 2,61', class: 'p-glukagon' }, lg); T('glukagon', { x: 22, y: 61, 'font-size': 13, class: 't-dim' }, lg);
+    T('Modell, inte mätdata', { x: 940, y: 530, 'text-anchor': 'end', 'font-size': 12, class: 't-dim' }, svg);
+
+    // Sampla banorna så att partiklarna kan följa dem
+    sampel = {};
+    for (const k in BANOR) {
+      const p = E('path', { d: BANOR[k] }, svg), L = p.getTotalLength(), pts = [];
+      for (let i = 0; i <= 60; i++) { const q = p.getPointAtLength(L * i / 60); pts.push([q.x, q.y]); }
+      sampel[k] = { L, pts }; svg.removeChild(p);
+    }
+  }
+
+  function punkt(bana, s) {
+    const pts = sampel[bana].pts, f = klamp(s, 0, 1) * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(f)), r = f - i;
+    return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * r, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * r];
+  }
+
+  function nyPartikel(art, bana) {
+    if (partiklar.length > 240) return;
+    let el;
+    if (art === 'glukos') el = E('circle', { r: 4.6, class: 'p-glukos' }, R.partGrp);
+    else if (art === 'insulin') el = E('rect', { x: -4, y: -4, width: 8, height: 8, class: 'p-insulin' }, R.partGrp);
+    else el = E('polygon', { points: '0,-6 6,5 -6,5', class: 'p-glukagon' }, R.partGrp);
+    partiklar.push({ el, art, bana, s: 0, fart: art === 'glukos' ? 150 : 130 });
+  }
+
+  // Parametrarna ändrades: uppdatera celler, receptorer och tecken.
+  function parametrar(Pn) {
+    P = Pn;
+    for (const id of ['beta', 'alfa']) {
+      const levande = Math.round(5 * P[id].funk);
+      R.cell[id].forEach((c, k) => c.classList.toggle('dod', k >= levande));
+    }
+    const lev = Math.round(4 * P.upptag.rec);
+    R.recept.forEach((r, k) => r.classList.toggle('dod', k >= lev));
+    setTecken('G>beta', P.beta.dir >= 0 ? 1 : -1);
+    setTecken('G>alfa', P.alfa.dir >= 0 ? 1 : -1);
+  }
+  function setTecken(id, t) {
+    const g = R.badge[id]; if (!g) return;
+    g.querySelector('text').textContent = t > 0 ? '+' : '−';
+    g.classList.toggle('plus', t > 0); g.classList.toggle('minus', t < 0);
+  }
+
+  // Lys upp slingorna. lista = Motor.slingor(...) eller null.
+  function visaSlingor(lista, def, Pn) {
+    slingorNu = lista || [];
+    for (const k in R.kant) { R.kant[k].setAttribute('class', 'kant'); }
+    for (const id in R.badge) R.badge[id].classList.toggle('dold', !SYNLIGA.has(id));
+    R.tagg.forEach(t => { t.textContent = ''; });
+    if (!lista) return;
+    const kanter = Motor.kanter(def, Pn);
+    lista.forEach((s, n) => {
+      for (const k of s.kanter) {
+        if (R.kant[k.id]) R.kant[k.id].setAttribute('class', 'kant pa k' + (n % 4));
+        if (R.badge[k.id]) { R.badge[k.id].classList.remove('dold'); setTecken(k.id, kanter.find(x => x.id === k.id).tecken); }
+      }
+    });
+    lista.forEach((s, n) => {
+      if (n > 1) return;
+      const t = R.tagg[n], x = t.getAttribute('x'), farg = s.typ === 'negativ' ? 'var(--negativ)' : 'var(--positiv)';
+      t.textContent = ''; t.style.fill = farg;
+      const a = E('tspan', { x }, t); a.textContent = `Slinga ${n + 1}`;
+      const b = E('tspan', { x, dy: 17, 'font-weight': 400 }, t); b.textContent = `${s.typ} återkoppling`;
+    });
+  }
+
+  function markera(id) {
+    R.svg.querySelectorAll('.nod').forEach(n => n.classList.toggle('vald', n.dataset.nod === id));
+  }
+
+  // Nivåer, ventiler och glöd vid index i.
+  function tillstand(main, i) {
+    const s = main.ser, g = s.G[i], hv = BOTTEN - yG(g);
+    R.vatska.setAttribute('y', yG(g)); R.vatska.setAttribute('height', hv + 2);
+    R.yta.setAttribute('y1', yG(g)); R.yta.setAttribute('y2', yG(g));
+    R.gtext.textContent = fmt(g, 1);
+    R.over.setAttribute('opacity', g > TANK.max ? 1 : 0);
+    R.gtext2.setAttribute('x', TANK.x + 14 + R.gtext.getComputedTextLength());
+    const f = klamp(s.F[i] / 100, 0, 1) * (STORE.h - 4);
+    R.forrFyll.setAttribute('y', STORE.y + STORE.h - 2 - f); R.forrFyll.setAttribute('height', f);
+    const m = klamp(s['pool:mage'][i] / 12, 0, 1) * (MAGE.h - 4);
+    R.matFyll.setAttribute('y', MAGE.y + MAGE.h - 2 - m); R.matFyll.setAttribute('height', m);
+    for (const id of ['beta', 'alfa']) R['glod_' + id].setAttribute('opacity', (0.1 + 0.55 * s[id][i]).toFixed(3));
+    for (const id of ['insulin', 'glukagon']) R.chip[id].setAttribute('width', Math.max(0, 80 * klamp(s[id][i] / 1.5, 0, 1)).toFixed(1));
+    for (const id of ['upptag', 'friset']) {
+      const o = klamp(s['oppen:' + id][i], 0, 1);
+      R.ventil[id].setAttribute('transform', `rotate(${(90 * (1 - o)).toFixed(1)})`);
+    }
+    // Antal glukospartiklar i tanken ∝ vätskans volym (jämn täthet)
+    R.malPrickar = Math.min(130, Math.round((TANK.b - 8) * hv / 640));
+  }
+
+  function tick(main, i, dtR, fart) {
+    const s = main.ser;
+    if (dtR > 0) {
+      const flodar = [['mage', s.mage[i], 'glukos'], ['upptag', s.upptag[i], 'glukos'], ['friset', s.friset[i], 'glukos'], ['forb', s.forb[i], 'glukos']];
+      for (const [bana, flod, art] of flodar) {
+        ack[bana] = (ack[bana] || 0) + Math.min(16, flod * fart * 3.2) * dtR;
+        while (ack[bana] >= 1) { ack[bana] -= 1; nyPartikel(art, bana); }
+      }
+      for (const h of ['insulin', 'glukagon']) {
+        ack[h] = (ack[h] || 0) + Math.min(14, s[h][i] * 7) * dtR;
+        while (ack[h] >= 1) { ack[h] -= 1; nyPartikel(h, h); }
+      }
+      for (let k = partiklar.length - 1; k >= 0; k--) {
+        const p = partiklar[k];
+        p.s += p.fart * dtR / sampel[p.bana].L;
+        if (p.s >= 1) { p.el.remove(); partiklar.splice(k, 1); continue; }
+        const [x, y] = punkt(p.bana, p.s);
+        p.el.setAttribute('transform', p.art === 'insulin' ? `translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(45)` : `translate(${x.toFixed(1)},${y.toFixed(1)})`);
+      }
+    }
+    // Glukospunkter som vimlar i tanken
+    const mal = R.malPrickar || 0, topp = parseFloat(R.vatska.getAttribute('y')) || BOTTEN;
+    while (prickar.length < mal && prickar.length < mal) {
+      const c = E('circle', { r: 3, class: 'punkt' }, R.prickGrp);
+      prickar.push({ el: c, x: TANK.x + 8 + Math.random() * (TANK.b - 16), y: topp + Math.random() * (BOTTEN - topp - 4), vx: 0, vy: 0 });
+    }
+    while (prickar.length > mal) prickar.pop().el.remove();
+    for (const q of prickar) {
+      if (dtR > 0) {
+        q.vx = q.vx * 0.9 + (Math.random() - 0.5) * 40; q.vy = q.vy * 0.9 + (Math.random() - 0.5) * 40;
+        q.x = klamp(q.x + q.vx * dtR, TANK.x + 6, TANK.x + TANK.b - 6);
+        q.y = q.y + q.vy * dtR;
+      }
+      q.y = klamp(q.y, topp + 5, BOTTEN - 5);
+      q.el.setAttribute('cx', q.x.toFixed(1)); q.el.setAttribute('cy', q.y.toFixed(1));
+    }
+  }
+
+  function rensaPartiklar() { partiklar.forEach(p => p.el.remove()); partiklar = []; ack = {}; }
+
+  return { bygg, tillstand, tick, parametrar, visaSlingor, markera, rensaPartiklar };
+})();
+
+/* =========================================================================
+   Diagram: SVG-kurvor som ritas om vid storleksändring. Hela förloppet är
+   förberäknat; markören avslöjar bara kurvan fram till nuvarande tid.
+   ========================================================================= */
+const Diagram = (() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const E = (tag, a, p) => { const e = document.createElementNS(NS, tag); for (const k in (a || {})) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+  let uid = 0;
+
+  function skapa(rot, cb) {
+    const svg = E('svg', { class: 'diagram' }, rot);
+    const id = 'dk' + (uid++);
+    let c = null, m = { l: 40, r: 12, t: 16, b: 20 }, W = 0, H = 0, bx, bw, by, bh, klippRect, hair, prick, hand;
+
+    function rita(cfg) {
+      c = cfg;
+      const r = rot.getBoundingClientRect();
+      W = Math.max(240, r.width); H = Math.max(50, r.height);
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = '';
+      bx = m.l; bw = W - m.l - m.r; by = m.t; bh = H - m.t - m.b;
+      const X = t => bx + bw * t / c.langd, Y = v => by + bh * (1 - v / c.ymax);
+      c.X = X; c.Y = Y;
+      const defs = E('defs', {}, svg), kl = E('clipPath', { id }, defs);
+      klippRect = E('rect', { x: bx, y: 0, width: 0, height: H }, kl);
+      if (c.band) E('rect', { x: bx, y: Y(c.band[1]), width: bw, height: Y(c.band[0]) - Y(c.band[1]), class: 'normal' }, svg);
+      for (let v = 0; v <= c.ymax + 1e-9; v += c.ystep) {
+        E('line', { x1: bx, x2: bx + bw, y1: Y(v), y2: Y(v), class: 'rut' }, svg);
+        const t = E('text', { x: bx - 6, y: Y(v) + 4, 'text-anchor': 'end' }, svg); t.textContent = c.ytext ? c.ytext(v) : String(v);
+      }
+      const steg = c.langd <= 300 ? 30 : 60;
+      for (let t = 0; t <= c.langd + 1e-9; t += steg) {
+        E('line', { x1: X(t), x2: X(t), y1: by + bh, y2: by + bh + 4, class: 'axel' }, svg);
+        const tx = E('text', { x: X(t), y: H - 4, 'text-anchor': 'middle' }, svg); tx.textContent = t === 0 ? '0 min' : String(t);
+      }
+      E('line', { x1: bx, x2: bx + bw, y1: by + bh, y2: by + bh, class: 'axel' }, svg);
+      if (c.bord != null) E('line', { x1: bx, x2: bx + bw, y1: Y(c.bord), y2: Y(c.bord), class: 'hand' }, svg);
+      // Händelsemarkörer
+      let rad = 0, sist = -99;
+      for (const e of (c.handelser || [])) {
+        const x = X(e.t);
+        E('line', { x1: x, x2: x, y1: by - 2, y2: by + bh, class: 'markor-linje' }, svg);
+        if (c.markorer) {
+          rad = x - sist < 56 ? 1 - rad : 0;
+          const tx = E('text', { x: x + 4, y: 11 + rad * 12, class: 'markor' }, svg);
+          tx.textContent = e.etikett; sist = x;
+        }
+      }
+      path(c.frisk, 's-frisk', false);
+      if (c.pred && c.pred.length > 1) {
+        const d = c.pred.map((p, k) => (k ? 'L' : 'M') + X(p.x).toFixed(1) + ',' + Y(p.y).toFixed(1)).join('');
+        E('path', { d, class: 's-pred' }, svg);
+      }
+      const g = E('g', { 'clip-path': `url(#${id})` }, svg);
+      for (const s of c.serier) path(s, s.klass, true, g);
+      hair = E('line', { y1: by, y2: by + bh, class: 'hair' }, svg);
+      prick = c.serier.length ? E('circle', { r: 5, class: 'prick' }, svg) : null;
+      if (c.titel) {
+        let x = bx + 8;
+        const tt = E('text', { x, y: by + 10, class: 'lappen2' }, svg); tt.textContent = c.titel; x += tt.getComputedTextLength() + 14;
+        for (const l of (c.legend || [])) {
+          E('line', { x1: x, x2: x + 16, y1: by + 6, y2: by + 6, class: l.k }, svg);
+          const lt = E('text', { x: x + 21, y: by + 10, class: 'lappen2' }, svg); lt.textContent = l.t; x += 21 + lt.getComputedTextLength() + 12;
+        }
+      }
+      if (c.lapp) { const l = E('text', { x: bx + bw / 2, y: by + bh / 2, 'text-anchor': 'middle', class: 'lappen' }, svg); l.textContent = c.lapp; }
+      flytta(c.cursor || 0);
+    }
+
+    function path(s, klass, klipp, foralder) {
+      if (!s) return;
+      const y = s.y || s, k = s.klass || klass;
+      let d = '';
+      const stegN = Math.max(1, Math.round(1 / c.dt));
+      for (let i = 0; i < y.length; i += stegN) d += (i ? 'L' : 'M') + c.X(i * c.dt).toFixed(1) + ',' + c.Y(y[i]).toFixed(1);
+      E('path', { d, class: k }, foralder || svg);
+    }
+
+    function flytta(t) {
+      if (!c) return;
+      c.cursor = t;
+      const x = c.X(t);
+      klippRect.setAttribute('width', Math.max(0, x - bx));
+      hair.setAttribute('x1', x); hair.setAttribute('x2', x);
+      if (prick && c.serier[0]) {
+        const y = c.serier[0].y, i = Math.min(y.length - 1, Math.round(t / c.dt));
+        prick.setAttribute('cx', x); prick.setAttribute('cy', c.Y(y[i]));
+      }
+    }
+
+    // Pekare: bläddra, eller rita förutsägelse
+    function tid(ev) {
+      const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width, py = (ev.clientY - r.top) * H / r.height;
+      return { t: klamp((px - bx) / bw, 0, 1) * c.langd, v: klamp((1 - (py - by) / bh) * c.ymax, 0, c.ymax) };
+    }
+    let trycker = false;
+    svg.addEventListener('pointerdown', ev => { if (!c) return; trycker = true; svg.setPointerCapture(ev.pointerId); const p = tid(ev); cb.ned(p.t, p.v); });
+    svg.addEventListener('pointermove', ev => { if (!c || !trycker) return; const p = tid(ev); cb.flytt(p.t, p.v); });
+    const slut = () => { if (trycker) { trycker = false; cb.upp && cb.upp(); } };
+    svg.addEventListener('pointerup', slut); svg.addEventListener('pointercancel', slut);
+
+    new ResizeObserver(() => { if (c) rita(c); }).observe(rot);
+    return { rita, flytta, tom: () => !c };
+  }
+  return { skapa };
+})();
+
+/* =========================================================================
+   App: tillstånd, uppdragsflöde, reglage och animationsloop.
+   ========================================================================= */
+const App = (() => {
+  const def = BLODSOCKER;
+  const S = {
+    uppdrag: UPPDRAG[0], start: {}, hand: [], main: null, frisk: null, bord: 5,
+    cursor: 0, spelar: false, fart: 6, harSpelat: false, slut: false,
+    pred: [], ritar: false, vald: 'beta', flik: 'komp', visaSling: false, svarat: false,
+  };
+  const $ = id => document.getElementById(id);
+  let dg, dh, sistaIdx = -1, senast = 0, ritaLage = false;
+
+  const idx = t => Math.min(S.main.n, Math.max(0, Math.round(t / def.dt)));
+  const etikett = e => ({ maltid: 'Måltid', dos: 'Insulin', motion: 'Motion', par: 'Ändring' }[e.typ]);
+
+  /* ---------- beräkning ---------- */
+  function rakna() {
+    const u = S.uppdrag;
+    S.main = Motor.kor(def, { start: S.start, hand: S.hand, langd: u.langd });
+    const avviker = Object.keys(S.start).length > 0 || S.hand.some(e => e.typ === 'par');
+    S.frisk = avviker ? Motor.kor(def, { start: {}, hand: S.hand.filter(e => e.typ !== 'par'), langd: u.langd }) : null;
+    if (S.frisk && S.frisk.ser.G.every((v, i) => Math.abs(v - S.main.ser.G[i]) < 0.03)) S.frisk = null;
+    S.bord = Motor.kor(def, { start: {}, hand: [], langd: 10 }).ser.G[0];
+  }
+  const parNu = () => Motor.parVid(def, S.start, S.hand, S.cursor);
+
+  /* ---------- uppdrag ---------- */
+  function valjUppdrag(id) {
+    const u = UPPDRAG.find(x => x.id === id) || UPPDRAG[0];
+    S.uppdrag = u; S.start = Object.assign({}, u.start); S.hand = u.hand.map(e => Object.assign({}, e));
+    S.cursor = 0; S.spelar = false; S.harSpelat = false; S.slut = false; S.pred = []; S.ritar = !u.fri;
+    S.svarat = false; S.visaSling = false; S.vald = 'beta';
+    $('valj-uppdrag').value = u.id;
+    $('sandlada-kort').hidden = !u.fri;
+    rakna(); Vy.rensaPartiklar(); byggKort(); ritaAllt(); uppdatera(true); visaFlik('komp');
+  }
+
+  function byggKort() {
+    const u = S.uppdrag, k = $('uppdrag-kort');
+    k.innerHTML = '';
+    const h = document.createElement('h2'); h.textContent = u.fri ? 'Sandlådan' : 'Uppdrag'; k.appendChild(h);
+    const t = document.createElement('div'); t.className = 'komp-namn'; t.textContent = u.rubrik; t.style.fontSize = '16px'; k.appendChild(t);
+    if (!u.fri) {
+      const st = document.createElement('div'); st.className = 'steg'; st.id = 'steg';
+      st.innerHTML = '<span>1 Förutsäg</span><span>2 Kör</span><span>3 Förklara</span>'; k.appendChild(st);
+    }
+    const p = document.createElement('p'); p.className = 'uppgift'; p.textContent = u.uppgift; k.appendChild(p);
+    const kon = document.createElement('div'); kon.id = 'kort-kon'; k.appendChild(kon);
+    if (u.fri) byggSandlada();
+    kortStatus();
+  }
+
+  function kortStatus() {
+    const u = S.uppdrag, kon = $('kort-kon');
+    if (!kon || u.fri) { return; }
+    kon.innerHTML = '';
+    const up = $('uppdrag-kort').querySelector('.uppgift'); if (up) up.hidden = S.slut;
+    const st = $('steg').children;
+    const nu = !S.harSpelat ? 0 : (S.slut ? 2 : 1);
+    [...st].forEach((s, i) => { s.className = i < nu ? 'klar' : (i === nu ? 'nu' : ''); });
+    if (!S.harSpelat) {
+      const b = document.createElement('div'); b.className = 'rad';
+      const rensa = document.createElement('button'); rensa.className = 'knapp liten'; rensa.textContent = 'Rensa förutsägelse';
+      rensa.disabled = S.pred.length === 0; rensa.addEventListener('click', () => { S.pred = []; ritaAllt(); kortStatus(); });
+      b.appendChild(rensa); kon.appendChild(b);
+      const tip = document.createElement('p'); tip.className = 'dim'; tip.style.marginTop = '6px';
+      tip.textContent = 'Dra med musen i blodglukoskurvan. Du kan hoppa över och trycka Start direkt.'; kon.appendChild(tip);
+    } else if (!S.slut) {
+      const tip = document.createElement('p'); tip.className = 'dim'; tip.textContent = 'Följ blodsockret i kretsen och i kurvorna.'; kon.appendChild(tip);
+    } else {
+      jamfor(kon); fragan(kon);
+    }
+  }
+
+  function jamfor(kon) {
+    const u = S.uppdrag, y = S.main.ser.G, topp = u.matt === 'topp';
+    const ex = topp ? Math.max(...y) : Math.min(...y);
+    const ei = y.indexOf(ex);
+    const ruta = document.createElement('div'); ruta.className = 'ruta'; ruta.setAttribute('role', 'status');
+    const ord = topp ? 'högsta värde' : 'lägsta värde';
+    let html = `<b>Modellen:</b> ${ord} ${fmt(ex)} mmol/l efter ${Math.round(ei * def.dt)} min.`;
+    if (S.pred.length > 1) {
+      const py = S.pred.map(p => p.y), pe = topp ? Math.max(...py) : Math.min(...py);
+      const px = S.pred.find(p => p.y === pe).x;
+      html += `<br><b>Din förutsägelse:</b> ${ord} ${fmt(pe)} mmol/l efter ${Math.round(px)} min.`;
+    }
+    ruta.innerHTML = html; kon.appendChild(ruta);
+  }
+
+  function fragan(kon) {
+    const f = S.uppdrag.fraga, box = document.createElement('div'); box.className = 'fraga';
+    const q = document.createElement('div'); q.className = 'q'; q.textContent = f.q; box.appendChild(q);
+    const ordning = f.val.map((v, i) => i);
+    for (let i = ordning.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ordning[i], ordning[j]] = [ordning[j], ordning[i]]; }
+    const atg = document.createElement('div'); atg.className = 'atergiv'; atg.setAttribute('role', 'status');
+    const knappar = ordning.map(i => {
+      const v = f.val[i], b = document.createElement('button'); b.className = 'val'; b.type = 'button'; b.textContent = v.t;
+      b.addEventListener('click', () => {
+        knappar.forEach(x => { x.disabled = true; });
+        f.val.forEach((vv, ii) => { if (vv.ratt) knappar[ordning.indexOf(ii)].classList.add('ratt'); });
+        if (!v.ratt) b.classList.add('fel');
+        atg.textContent = (v.ratt ? 'Rätt. ' : 'Inte riktigt. ') + v.svar;
+        b.after(atg); atg.scrollIntoView({ block: 'nearest' });
+        S.svarat = true; efterSvar(box);
+      });
+      box.appendChild(b); return b;
+    });
+    kon.appendChild(box);
+  }
+
+  function efterSvar(box) {
+    const i = UPPDRAG.indexOf(S.uppdrag), rad = document.createElement('div'); rad.className = 'rad'; rad.style.marginTop = '8px';
+    const sl = document.createElement('button'); sl.className = 'knapp'; sl.textContent = 'Visa slingorna';
+    sl.addEventListener('click', () => { S.visaSling = true; visaFlik('sling'); });
+    rad.appendChild(sl);
+    if (i < UPPDRAG.length - 1) {
+      const n = document.createElement('button'); n.className = 'knapp primar'; n.textContent = 'Nästa →';
+      n.addEventListener('click', () => valjUppdrag(UPPDRAG[i + 1].id)); rad.appendChild(n);
+    }
+    box.appendChild(rad);
+  }
+
+  /* ---------- sandlådan ---------- */
+  function byggSandlada() {
+    const k = $('sandlada-kort'); k.innerHTML = '';
+    const grupp = (titel, innehall) => { const g = document.createElement('div'); g.className = 'grupp'; const h = document.createElement('h3'); h.textContent = titel; g.appendChild(h); g.appendChild(innehall); k.appendChild(g); };
+    const rad = (...knappar) => { const r = document.createElement('div'); r.className = 'rad'; knappar.forEach(b => r.appendChild(b)); return r; };
+    const kn = (txt, fn, cls = 'knapp liten') => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = txt; b.addEventListener('click', fn); return b; };
+    const h = document.createElement('h2'); h.textContent = 'Störningar'; k.appendChild(h);
+    grupp('Måltid', rad(kn('Liten', () => handelse({ typ: 'maltid', storlek: 5 })), kn('Medel', () => handelse({ typ: 'maltid', storlek: 10 })), kn('Stor', () => handelse({ typ: 'maltid', storlek: 16 }))));
+    grupp('Insulinspruta', rad(kn('Liten dos', () => handelse({ typ: 'dos', storlek: 30 })), kn('Stor dos', () => handelse({ typ: 'dos', storlek: 60 }))));
+    grupp('Motion', rad(kn('30 min', () => handelse({ typ: 'motion', faktor: 3, langd: 30 }))));
+    const lage = document.createElement('div'); lage.className = 'lage-lista';
+    for (const l of LAGEN) lage.appendChild(kn(l.namn, () => satt_lage(l)));
+    grupp('Läge', lage);
+    const not = document.createElement('p'); not.className = 'dim'; not.textContent = 'Händelser läggs in vid nuvarande tid. Dra i kurvan för att gå tillbaka och lägga in fler.'; k.appendChild(not);
+  }
+
+  const avrunda = t => Math.round(t / def.dt) * def.dt;
+
+  function handelse(e) {
+    if (S.cursor >= S.main.langd - 1) return;
+    e.t = avrunda(S.cursor); e.etikett = etikett(e);
+    S.hand.push(e); efterAndring(true);
+  }
+  function satt_lage(l) {
+    for (const nyckel in l.par) paEvent(nyckel, l.par[nyckel]);
+    efterAndring(true);
+  }
+  function paEvent(nyckel, varde, glid) {
+    const t = avrunda(S.cursor);
+    if (t === 0 && !S.hand.some(e => e.t === 0 && e.typ !== 'par')) { S.start[nyckel] = varde; return; }
+    // Ett reglage som dras ger en enda ändring, inte en per pixel.
+    const sist = S.hand.findIndex(e => e.typ === 'par' && e.nyckel === nyckel && (glid ? Math.abs(e.t - t) <= 5 : e.t === t));
+    if (sist >= 0) { S.hand[sist].varde = varde; return; }
+    S.hand.push({ t, typ: 'par', nyckel, varde, etikett: 'Ändring' });
+  }
+  function efterAndring(starta, fraReglage) {
+    rakna(); ritaAllt(); uppdatera(true);
+    const P = parNu();
+    Vy.parametrar(P);
+    if (S.flik === 'sling') { byggSlingor(); Vy.visaSlingor(Motor.slingor(def, P), def, P); }
+    else if (!fraReglage) byggKomponent();
+    if (starta && !S.spelar && S.cursor < S.main.langd - 1) spela();
+  }
+
+  /* ---------- rutor och paneler ---------- */
+  function visaFlik(f, behall) {
+    S.flik = f;
+    $('flik-komp').hidden = f !== 'komp'; $('flik-sling').hidden = f !== 'sling';
+    $('flik-komp-knapp').setAttribute('aria-selected', f === 'komp'); $('flik-sling-knapp').setAttribute('aria-selected', f === 'sling');
+    if (f === 'komp') byggKomponent(); else byggSlingor();
+    const pa = f === 'sling';
+    const P = parNu();
+    Vy.parametrar(P);
+    Vy.visaSlingor(pa ? Motor.slingor(def, P) : null, def, P);
+  }
+
+  // Reglagens visningsvärde: skala 1 = andel som procent, annat tal = procent av standardvärdet.
+  const tillVis = (r, v) => r.skala === 1 ? v * 100 : (r.skala ? v / r.skala * 100 : v);
+  const franVis = (r, x) => r.skala === 1 ? x / 100 : (r.skala ? x / 100 * r.skala : x);
+
+  function byggKomponent() {
+    const id = S.vald, info = KOMPONENT[id], n = def.noder.find(x => x.id === id), rot = $('flik-komp');
+    Vy.markera(id);
+    rot.innerHTML = '';
+    const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; rot.appendChild(e); return e; };
+    mk('div', 'komp-typ', info.slag);
+    mk('div', 'komp-namn', n.namn);
+    mk('p', '', info.text).style.marginTop = '6px';
+    mk('div', 'just-nu', '').id = 'just-nu';
+    const P = parNu(), lasta = !S.uppdrag.fri;
+    for (const r of (info.reglage || [])) {
+      const v = P[id][r.nyckel], box = mk('div', 'reglage');
+      if (r.val) {
+        const l = document.createElement('div'); l.className = 'dim'; l.textContent = r.etikett; box.appendChild(l);
+        const seg = document.createElement('span'); seg.className = 'segment'; seg.style.marginTop = '4px';
+        for (const [vv, txt] of r.val) {
+          const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; b.disabled = lasta;
+          b.setAttribute('aria-pressed', v === vv);
+          b.addEventListener('click', () => { paEvent(id + '.' + r.nyckel, vv); efterAndring(true); });
+          seg.appendChild(b);
+        }
+        box.appendChild(seg); continue;
+      }
+      const lab = document.createElement('label'); const sp = document.createElement('span'); sp.textContent = r.etikett;
+      const out = document.createElement('output'); lab.appendChild(sp); lab.appendChild(out); box.appendChild(lab);
+      const inp = document.createElement('input'); inp.type = 'range'; inp.min = r.min; inp.max = r.max; inp.step = r.steg || 1; inp.disabled = lasta;
+      inp.setAttribute('aria-label', r.etikett);
+      inp.value = tillVis(r, v);
+      const upd = () => { out.textContent = (r.enhet === 'mmol/l' ? fmt(+inp.value, 1) : Math.round(+inp.value)) + ' ' + r.enhet; };
+      upd();
+      inp.addEventListener('input', () => {
+        upd(); paEvent(id + '.' + r.nyckel, franVis(r, +inp.value), true); efterAndring(false, true);
+      });
+      box.appendChild(inp);
+    }
+    if (lasta && info.reglage) mk('div', 'last', LASTNOT);
+    justNu();
+  }
+
+  function justNu() {
+    const e = $('just-nu'); if (!e || S.flik !== 'komp') return;
+    const i = idx(S.cursor), s = S.main.ser, id = S.vald, n = def.noder.find(x => x.id === id);
+    let t = '';
+    if (id === 'G') t = `${fmt(s.G[i])} mmol/l · börvärde ${fmt(S.bord)}`;
+    else if (id === 'F') t = `fyllnad ${Math.round(s.F[i])} %`;
+    else if (n.typ === 'sensor') t = `aktivitet ${Math.round(100 * s[id][i])} %`;
+    else if (n.typ === 'signal') t = `nivå ${fmt(s[id][i], 2)}`;
+    else if (n.typ === 'effektor') t = `flöde ${fmt(s[id][i], 2)} · öppning ${Math.round(100 * klamp(s['oppen:' + id][i], 0, 1))} %`;
+    else if (n.typ === 'storning') t = `kvar att ta upp ${fmt(s['pool:' + id][i], 1)}`;
+    e.textContent = t;
+  }
+
+  function byggSlingor() {
+    const rot = $('flik-sling'); rot.innerHTML = '';
+    const P = parNu(), lista = Motor.slingor(def, P), nm = id => def.noder.find(n => n.id === id).namn;
+    const mk = (cls, html) => { const e = document.createElement('div'); e.className = cls; e.innerHTML = html; rot.appendChild(e); return e; };
+    const tkn = t => t > 0 ? '<span class="tecken-pa">+</span>' : '<span class="tecken-av">−</span>';
+    lista.forEach((s, n) => {
+      const delar = s.kanter.map(k => `${nm(k.fran)} ${tkn(k.tecken)}`).join(' → ') + ` → <b>${nm(s.kanter[0].fran)}</b>`;
+      mk('slinga k' + (n % 4), `<h3>Slinga ${n + 1}: ${s.typ} återkoppling</h3><div class="vag">${delar}</div>` +
+        `<div class="vag">Minustecken: <b>${s.minus}</b> (${s.minus % 2 ? 'udda' : 'jämnt'})</div>`);
+    });
+    const tv = Motor.tavlande(lista);
+    for (const t of tv) mk('regel', `<b>Tävlande vägar:</b> slinga ${t.sanka.map(i => i + 1).join(', ')} sänker och slinga ${t.hoja.map(i => i + 1).join(', ')} höjer ${nm(t.storhet).toLowerCase()}.`);
+    mk('regel', 'Udda antal minustecken i en slinga ger negativ återkoppling. Jämnt antal ger positiv återkoppling.');
+  }
+
+  /* ---------- ritning ---------- */
+  function ritaAllt() {
+    const u = S.uppdrag, m = S.main;
+    const hand = S.hand.map(e => ({ t: e.t, etikett: e.etikett || etikett(e) }));
+    $('ford-frisk').hidden = !S.frisk; $('ford-pred').hidden = S.pred.length < 2;
+    $('kurv-tips').textContent = (S.ritar && !S.harSpelat && !u.fri) ? 'Dra i kurvan för att rita din förutsägelse' : 'Dra i kurvan för att bläddra i tiden';
+    dg.rita({
+      langd: m.langd, ymax: u.ymax, ystep: u.ymax <= 8 ? 1 : (u.ymax <= 14 ? 2 : 5), dt: def.dt, cursor: S.cursor,
+      band: [4, 6], bord: S.bord, handelser: hand, markorer: true,
+      serier: [{ y: m.ser.G, klass: 's-glukos' }], frisk: S.frisk ? S.frisk.ser.G : null, pred: S.pred,
+      lapp: (S.ritar && !S.harSpelat && !u.fri && S.pred.length < 2) ? 'Rita din förutsägelse här' : '',
+    });
+    dh.rita({
+      langd: m.langd, ymax: 2, ystep: 0.5, dt: def.dt, cursor: S.cursor, handelser: hand, markorer: false,
+      ytext: v => (v === 0 ? '0' : (v === 1 ? '1' : '')),
+      titel: 'Hormoner, relativ nivå', legend: [{ t: 'insulin', k: 's-insulin' }, { t: 'glukagon', k: 's-glukagon' }],
+      serier: [{ y: m.ser.insulin, klass: 's-insulin' }, { y: m.ser.glukagon, klass: 's-glukagon' }],
+    });
+  }
+
+  function uppdatera(tvinga) {
+    const i = idx(S.cursor);
+    if (!tvinga && i === sistaIdx) return;
+    sistaIdx = i;
+    Vy.tillstand(S.main, i);
+    dg.flytta(S.cursor); dh.flytta(S.cursor);
+    $('tid-rad').textContent = `t = ${String(Math.round(S.cursor)).padStart(3, ' ')} min · ${fmt(S.main.ser.G[i])} mmol/l`;
+    $('spela-knapp').textContent = S.spelar ? '⏸ Paus' : (S.cursor >= S.main.langd - 1 ? '▶ Spela igen' : '▶ Start');
+    justNu();
+  }
+
+  /* ---------- tid ---------- */
+  function spela() {
+    if (S.cursor >= S.main.langd - 1) { S.cursor = 0; S.slut = false; Vy.rensaPartiklar(); }
+    if (!S.harSpelat) { S.harSpelat = true; S.ritar = false; ritaAllt(); }
+    S.spelar = true; kortStatus(); uppdatera(true);
+  }
+  function paus() { S.spelar = false; uppdatera(true); }
+
+  function slutfor() {
+    S.spelar = false; S.slut = true; kortStatus(); uppdatera(true);
+  }
+
+  function ram(nu) {
+    const dtR = Math.min(0.1, (nu - senast) / 1000); senast = nu;
+    if (S.spelar) {
+      S.cursor = Math.min(S.main.langd, S.cursor + dtR * S.fart);
+      if (S.cursor >= S.main.langd - 1e-6) { S.cursor = S.main.langd; slutfor(); }
+    }
+    const i = idx(S.cursor);
+    Vy.tick(S.main, i, S.spelar ? dtR : 0, S.fart);
+    if (i !== sistaIdx) uppdatera(false);
+    requestAnimationFrame(ram);
+  }
+
+  /* ---------- start ---------- */
+  function init() {
+    Tema.init();
+    const sel = $('valj-uppdrag');
+    for (const u of UPPDRAG) { const o = document.createElement('option'); o.value = u.id; o.textContent = u.rubrik; sel.appendChild(o); }
+    sel.addEventListener('change', () => valjUppdrag(sel.value));
+
+    Vy.bygg($('krets'));
+    $('krets').addEventListener('click', ev => {
+      const n = ev.target.closest('.nod'); if (!n) return;
+      S.vald = n.dataset.nod; if (S.flik !== 'komp') visaFlik('komp'); else byggKomponent();
+    });
+    $('krets').addEventListener('keydown', ev => {
+      const n = ev.target.closest && ev.target.closest('.nod');
+      if (n && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); S.vald = n.dataset.nod; visaFlik('komp'); }
+    });
+
+    dg = Diagram.skapa($('kurv-g'), {
+      ned: (t, v) => {
+        if (S.ritar && !S.harSpelat && !S.uppdrag.fri) { S.pred = S.pred.filter(p => p.x < t); S.pred.push({ x: t, y: v }); ritaAllt(); }
+        else { S.cursor = t; S.spelar = false; Vy.rensaPartiklar(); uppdatera(true); }
+      },
+      flytt: (t, v) => {
+        if (S.ritar && !S.harSpelat && !S.uppdrag.fri) { S.pred = S.pred.filter(p => p.x < t); S.pred.push({ x: t, y: v }); ritaAllt(); }
+        else { S.cursor = t; S.spelar = false; uppdatera(true); }
+      },
+      upp: () => { if (S.ritar && !S.harSpelat) kortStatus(); },
+    });
+    dh = Diagram.skapa($('kurv-h'), {
+      ned: t => { S.cursor = t; S.spelar = false; Vy.rensaPartiklar(); uppdatera(true); },
+      flytt: t => { S.cursor = t; S.spelar = false; uppdatera(true); },
+    });
+
+    $('spela-knapp').addEventListener('click', () => { S.spelar ? paus() : spela(); });
+    $('borja-om').addEventListener('click', () => valjUppdrag(S.uppdrag.id));
+    $('fart').addEventListener('click', ev => {
+      const b = ev.target.closest('button'); if (!b) return;
+      S.fart = +b.dataset.fart;
+      $('fart').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    });
+    $('flik-komp-knapp').addEventListener('click', () => visaFlik('komp'));
+    $('flik-sling-knapp').addEventListener('click', () => visaFlik('sling'));
+    $('hjalp-knapp').addEventListener('click', () => $('hjalp').showModal());
+    $('hjalp-stang').addEventListener('click', () => $('hjalp').close());
+    document.addEventListener('keydown', ev => {
+      if (ev.target.closest && ev.target.closest('input,select,textarea')) return;
+      if (ev.key === ' ' && ev.target.tagName !== 'BUTTON') { ev.preventDefault(); S.spelar ? paus() : spela(); }
+      else if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') {
+        S.cursor = klamp(S.cursor + (ev.key === 'ArrowRight' ? 5 : -5), 0, S.main.langd); S.spelar = false; uppdatera(true);
+      }
+    });
+
+    valjUppdrag('maltid');
+    requestAnimationFrame(t => { senast = t; ram(t); });
+  }
+
+  return { init, S };
+})();
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', App.init);
+  else App.init();
+}
+</script>
+</body>
+</html>

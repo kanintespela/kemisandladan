@@ -1,16 +1,17 @@
-# Kemiappar
+# Pedagogiska webbappar
 
-Interaktiva kemiappar för gymnasiet – kör direkt i webbläsaren, ingen installation krävs.
+Interaktiva webbappar för gymnasiet i kemi och biologi – kör direkt i webbläsaren, ingen installation krävs.
 
-**[Öppna samlingssidan ➜](https://kanintespela.github.io/kemisandladan/)**
+**[Öppna samlingssidan ➜](https://kanintespela.github.io/kemisandladan/)** – välj kemi eller biologi.
 
-| App | Adress | Status |
-|---|---|---|
-| Kemisandlådan | [/sandladan/](https://kanintespela.github.io/kemisandladan/sandladan/) | beta 0.5 |
-| Bindningsverkstan | [/bindningsverkstan/](https://kanintespela.github.io/kemisandladan/bindningsverkstan/) | 0.13 |
-| Kemiska reaktioner och energi | [/reaktioner/](https://kanintespela.github.io/kemisandladan/reaktioner/) | prototyp 0.3 |
+| Ämne | App | Adress | Status |
+|---|---|---|---|
+| Kemi | Kemisandlådan | [/sandladan/](https://kanintespela.github.io/kemisandladan/sandladan/) | beta 0.5 |
+| Kemi | Bindningsverkstan | [/bindningsverkstan/](https://kanintespela.github.io/kemisandladan/bindningsverkstan/) | 0.13 |
+| Kemi | Kemiska reaktioner och energi | [/reaktioner/](https://kanintespela.github.io/kemisandladan/reaktioner/) | prototyp 0.3 |
+| Biologi | Reglerverkstan | [/reglerverkstan/](https://kanintespela.github.io/kemisandladan/reglerverkstan/) | 0.1 |
 
-Kemisandlådan låg tidigare direkt på [kanintespela.github.io/kemisandladan/](https://kanintespela.github.io/kemisandladan/). Där finns nu samlingssidan, med en länk till sandlådan.
+Kemisandlådan låg tidigare direkt på [kanintespela.github.io/kemisandladan/](https://kanintespela.github.io/kemisandladan/). Där finns nu samlingssidan, där man väljer ämne; kemiapparna ligger samlade på [/kemi/](https://kanintespela.github.io/kemisandladan/kemi/) och biologiapparna på [/biologi/](https://kanintespela.github.io/kemisandladan/biologi/). Adresserna till apparna är oförändrade.
 
 ## Kemisandlådan
 
@@ -28,9 +29,13 @@ Fem moduler om varför atomer håller ihop: attraktion och repulsion i en moleky
 
 Eleven förutsäger om en reaktion tar upp eller avger energi och går sedan energitrappan via fria atomer, steg för steg, med en partikelbild för varje steg. Tio reaktioner, från is som smälter till fotosyntesen.
 
+## Reglerverkstan
+
+Kroppens reglersystem som en levande krets, med blodsockerregleringen som första system. Glukos, insulin och glukagon flödar som partiklar, ventiler öppnas och stängs, och kurvorna följer med. Eleven förutsäger först, kör förloppet och förklarar efteråt, och kan ändra komponenterna: förstöra betacellerna (typ 1), minska receptorerna (typ 2), koppla bort glukagonvägen eller vända tecknet i insulinslingan. Appen räknar själv ut om en slinga är negativ eller positiv återkoppling och visar tävlande vägar.
+
 ## Ljust och mörkt tema
 
-Alla appar och samlingssidan har ett ljust och ett mörkt tema. Utan eget val följer de datorns inställning. Temaknappen uppe till höger byter, och valet sparas i webbläsaren och gäller då i alla apparna.
+Alla appar och samlingssidorna har ett ljust och ett mörkt tema. Utan eget val följer de datorns inställning. Temaknappen uppe till höger byter, och valet sparas i webbläsaren och gäller då i alla apparna.
 
 ## Status
 
@@ -43,11 +48,14 @@ Feedback och synpunkter tas gärna emot – öppna gärna ett [issue här på Gi
 Varje app är en enda fristående HTML-fil utan externa beroenden, byggberoenden eller installation. Den öppnas direkt i webbläsaren och fungerar även offline. Ingen inloggning, inget konto och ingen spårning.
 
 ```
-index.html                    samlingssidan
-bilder/                       skärmbilderna på samlingssidan, ljust och mörkt tema
+index.html                    startsidan: val av ämne
+kemi/index.html               samlingssidan för kemiapparna
+biologi/index.html            samlingssidan för biologiapparna
+bilder/                       skärmbilderna på samlingssidorna, ljust och mörkt tema
 sandladan/index.html          Kemisandlådan
 bindningsverkstan/index.html  Bindningsverkstan
 reaktioner/index.html         Kemiska reaktioner och energi
+reglerverkstan/index.html     Reglerverkstan
 ```
 
 ## Licens
