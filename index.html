@@ -4,8 +4,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kemiappar</title>
-<meta name="description" content="Interaktiva kemiappar för gymnasiet: Kemisandlådan, Bindningsverkstan och Kemiska reaktioner och energi. Körs direkt i webbläsaren.">
+<title>Pedagogiska webbappar</title>
+<meta name="description" content="Pedagogiska webbappar för gymnasiet i kemi och biologi: interaktiva modeller som körs direkt i webbläsaren.">
 <script id="tema-start">
   // Tema före första ritningen, så att sidan inte blinkar till i fel tema.
   // Ett sparat val (temaknappen) gäller i alla kemiappar på webbplatsen;
@@ -132,12 +132,25 @@
     .app .bild { border-right: 0; border-bottom: 1px solid var(--border); }
     .ingress h1 { font-size: 24px; }
   }
+
+  /* ---------- Val av ämne på startsidan ---------- */
+  .amnen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+  .amne { display: flex; flex-direction: column; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .amne:hover { border-color: var(--accent); }
+  .amne .bild { display: block; background: var(--bg3); border-bottom: 1px solid var(--border); line-height: 0; }
+  .amne img { width: 100%; height: auto; aspect-ratio: 16 / 9; display: block; }
+  .amne .text { padding: 20px 22px 22px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .amne h2 { font-size: 26px; line-height: 1.2; }
+  .amne h2 a { color: var(--text); text-decoration: none; }
+  .amne h2 a:hover { color: var(--accent); }
+  .amne p { font-size: 15px; }
+  @media (max-width: 820px) { .amnen { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 
 <header>
-  <span class="namn">⬡ Kemiappar</span>
+  <span class="namn">⬡ Pedagogiska webbappar</span>
   <button class="tema-knapp" id="tema-knapp" type="button" aria-label="Byt tema" title="Byt tema">
     <svg class="ikon-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     <svg class="ikon-mane" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z" fill="currentColor"/></svg>
@@ -146,61 +159,42 @@
 
 <main>
   <section class="ingress">
-    <h1>Kemiappar för gymnasiet</h1>
-    <p>Interaktiva modeller som visar vad atomer, molekyler och joner gör. Apparna körs direkt i webbläsaren,
-    utan installation, inloggning eller spårning, och fungerar bäst på en dator.</p>
+    <h1>Pedagogiska webbappar</h1>
+    <p>Interaktiva modeller för gymnasiet som visar det som är svårt att se: atomer, molekyler och kroppens
+    reglersystem. Apparna körs direkt i webbläsaren, utan installation, inloggning eller spårning, och fungerar
+    bäst på en dator. Välj ämne.</p>
   </section>
 
-  <div class="appar">
-    <article class="app">
-      <a class="bild" href="sandladan/" tabindex="-1">
-        <img class="bara-ljust" src="bilder/sandladan-ljust.webp" width="960" height="540" alt="Kemisandlådan: vattenmolekyler sammanbundna av vätebindningar i simuleringsrummet, med atompanelen till vänster och mätvärden till höger">
-        <img class="bara-morkt" src="bilder/sandladan-morkt.webp" width="960" height="540" alt="Kemisandlådan: vattenmolekyler sammanbundna av vätebindningar i simuleringsrummet, med atompanelen till vänster och mätvärden till höger">
+  <div class="amnen">
+    <article class="amne">
+      <a class="bild" href="kemi/" tabindex="-1">
+        <img class="bara-ljust" src="bilder/sandladan-ljust.webp" width="960" height="540" alt="Kemi: Kemisandlådan med vattenmolekyler sammanbundna av vätebindningar">
+        <img class="bara-morkt" src="bilder/sandladan-morkt.webp" width="960" height="540" alt="Kemi: Kemisandlådan med vattenmolekyler sammanbundna av vätebindningar">
       </a>
       <div class="text">
-        <h2><a href="sandladan/">Kemisandlådan</a><span class="version">BETA 0.5</span></h2>
-        <p>En partikelsimulator. Placera atomer och molekyler och se vad som händer: bindningar bildas och bryts,
-        vatten fryser till is, syror protolyserar och salter löses. Temperatur och volym går att ändra medan tryck,
-        koncentration och pH följs.</p>
-        <p>Sexton guidade uppdrag, de flesta i formen förutsäg, observera, förklara.</p>
+        <h2><a href="kemi/">Kemi</a></h2>
+        <p>Tre appar om partiklarna bakom kemin: en partikelsimulator med sexton uppdrag, en verkstad om kemisk
+        bindning och en om energin i reaktioner.</p>
         <ul class="omraden" aria-label="Områden">
-          <li>Stökiometri</li><li>VSEPR och polaritet</li><li>Fasövergångar</li><li>Syror och baser</li><li>Jonbindning</li><li>Diffusion</li>
+          <li>Partiklar</li><li>Kemisk bindning</li><li>Reaktioner och energi</li>
         </ul>
-        <a class="oppna" href="sandladan/">Öppna Kemisandlådan →</a>
+        <a class="oppna" href="kemi/">Till kemiapparna →</a>
       </div>
     </article>
 
-    <article class="app">
-      <a class="bild" href="bindningsverkstan/" tabindex="-1">
-        <img class="bara-ljust" src="bilder/bindningsverkstan-ljust.webp" width="960" height="540" alt="Bindningsverkstan, modulen Krafterna: två väteatomer med pilar för attraktion, repulsion och nettokraft, och en graf över kraften mot avståndet">
-        <img class="bara-morkt" src="bilder/bindningsverkstan-morkt.webp" width="960" height="540" alt="Bindningsverkstan, modulen Krafterna: två väteatomer med pilar för attraktion, repulsion och nettokraft, och en graf över kraften mot avståndet">
+    <article class="amne">
+      <a class="bild" href="biologi/" tabindex="-1">
+        <img class="bara-ljust" src="bilder/reglerverkstan-ljust.webp" width="960" height="540" alt="Biologi: Reglerverkstan i byggläget, med en byggd krets för blodsockerreglering">
+        <img class="bara-morkt" src="bilder/reglerverkstan-morkt.webp" width="960" height="540" alt="Biologi: Reglerverkstan i byggläget, med en byggd krets för blodsockerreglering">
       </a>
       <div class="text">
-        <h2><a href="bindningsverkstan/">Bindningsverkstan</a><span class="version">0.13</span></h2>
-        <p>Varför håller atomer ihop? Fem moduler om kemisk bindning: krafterna mellan två atomer och i en
-        jonkristall, energin när två atomer dras ihop, elektronegativitet som ett kontinuum, energitrappan från
-        natrium och klor till natriumklorid, och metallbindning.</p>
+        <h2><a href="biologi/">Biologi</a><span class="version">NY</span></h2>
+        <p>Kroppens reglersystem som en levande krets: ändra, bryt och bygg själv, och se hur negativ och positiv
+        återkoppling fungerar.</p>
         <ul class="omraden" aria-label="Områden">
-          <li>Kovalent bindning</li><li>Jonbindning</li><li>Elektronegativitet</li><li>Metallbindning</li><li>Bindningsenergi</li>
+          <li>Homeostas</li><li>Återkoppling</li><li>Blodsocker</li>
         </ul>
-        <a class="oppna" href="bindningsverkstan/">Öppna Bindningsverkstan →</a>
-      </div>
-    </article>
-
-    <article class="app">
-      <a class="bild" href="reaktioner/" tabindex="-1">
-        <img class="bara-ljust" src="bilder/reaktioner-ljust.webp" width="960" height="540" alt="Kemiska reaktioner och energi: energitrappan för metan som brinner, med steg upp när bindningar bryts och steg ned när nya bildas, och partikelbilden under">
-        <img class="bara-morkt" src="bilder/reaktioner-morkt.webp" width="960" height="540" alt="Kemiska reaktioner och energi: energitrappan för metan som brinner, med steg upp när bindningar bryts och steg ned när nya bildas, och partikelbilden under">
-      </a>
-      <div class="text">
-        <h2><a href="reaktioner/">Kemiska reaktioner och energi</a><span class="version">PROTOTYP 0.3</span></h2>
-        <p>Tar reaktionen upp eller avger den energi? Förutsäg först och gå sedan energitrappan steg för steg:
-        bryt reaktanternas bindningar till fria atomer och bilda produkternas. Tio reaktioner, från is som smälter
-        till fotosyntesen, med en partikelbild för varje steg.</p>
-        <ul class="omraden" aria-label="Områden">
-          <li>Endoterm och exoterm</li><li>Bindningar bryts och bildas</li><li>Energitrappa</li><li>ΔH</li>
-        </ul>
-        <a class="oppna" href="reaktioner/">Öppna Kemiska reaktioner och energi →</a>
+        <a class="oppna" href="biologi/">Till biologiapparna →</a>
       </div>
     </article>
   </div>
