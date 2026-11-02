@@ -9,7 +9,7 @@ Interaktiva webbappar för gymnasiet i kemi och biologi – kör direkt i webbl�
 | Kemi | Kemisandlådan | [/sandladan/](https://kanintespela.github.io/kemisandladan/sandladan/) | beta 0.5 |
 | Kemi | Bindningsverkstan | [/bindningsverkstan/](https://kanintespela.github.io/kemisandladan/bindningsverkstan/) | 0.13 |
 | Kemi | Kemiska reaktioner och energi | [/reaktioner/](https://kanintespela.github.io/kemisandladan/reaktioner/) | prototyp 0.3 |
-| Biologi | Reglerverkstan | [/reglerverkstan/](https://kanintespela.github.io/kemisandladan/reglerverkstan/) | 0.2 |
+| Biologi | Reglerverkstan | [/reglerverkstan/](https://kanintespela.github.io/kemisandladan/reglerverkstan/) | 0.3 |
 
 Kemisandlådan låg tidigare direkt på [kanintespela.github.io/kemisandladan/](https://kanintespela.github.io/kemisandladan/). Där finns nu samlingssidan, där man väljer ämne; kemiapparna ligger samlade på [/kemi/](https://kanintespela.github.io/kemisandladan/kemi/) och biologiapparna på [/biologi/](https://kanintespela.github.io/kemisandladan/biologi/). Adresserna till apparna är oförändrade.
 
@@ -34,6 +34,8 @@ Eleven förutsäger om en reaktion tar upp eller avger energi och går sedan ene
 Kroppens reglersystem som en levande krets, med blodsockerregleringen som första system. Glukos, insulin och glukagon flödar som partiklar, ventiler öppnas och stängs, och kurvorna följer med. Eleven förutsäger först, kör förloppet och förklarar efteråt, och kan ändra komponenterna: förstöra betacellerna (typ 1), minska receptorerna (typ 2), koppla bort glukagonvägen eller vända tecknet i insulinslingan. Appen räknar själv ut om en slinga är negativ eller positiv återkoppling och visar tävlande vägar.
 
 I byggläget bygger eleven kretsen själv av färdiga delar (blodsocker och kroppstemperatur): lägger till komponenter, kopplar dem med musen och väljer tecken. Kretsen bedöms på hur den beter sig i tre situationer, så flera olika kopplingar kan vara rätt.
+
+I fritt bygge bygger eleven på en tom duk med egna storheter, källor, förluster, ventiler, sensorer och signaler, drar rören själv, lägger in störningar och läser en rapport om vad som hände. Det går också att börja från en färdig krets (blodsocker eller temperatur) och ta sönder eller bygga ut den.
 
 ## Ljust och mörkt tema
 
