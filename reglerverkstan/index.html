@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reglerverkstan 0.2</title>
+<title>Reglerverkstan 0.3</title>
 <script id="tema-start">
   // Tema före första ritningen, så att sidan inte blinkar till i fel tema.
   // Ett sparat val (temaknappen) gäller i alla apparna på webbplatsen;
@@ -266,6 +266,15 @@
   .del { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; padding: 6px 9px; background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 14px; cursor: pointer; }
   .del:hover { border-color: var(--accent); }
   .del-typ { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); min-width: 62px; }
+  .palett.rutnat { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .palett.rutnat .del { flex-direction: column; gap: 0; align-items: flex-start; }
+  .palett.rutnat .del-typ { min-width: 0; }
+  .namnfalt { width: 100%; background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .handelser { list-style: none; margin-top: 6px; font-size: 13px; }
+  .handelser li { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .rapport { margin-bottom: 6px; font-size: 14px; padding-left: 8px; border-left: 3px solid var(--border); }
+  .rapport.ok { border-left-color: var(--accent2); } .rapport.fel { border-left-color: var(--warm); }
+  #kurv-val { font-size: 13px; padding: 2px 6px; }
   .situationer { display: flex; flex-direction: column; gap: 5px; }
   .sit { border: 1px solid var(--border); border-radius: 8px; background: var(--bg3); }
   .sit.vald { border-color: var(--accent); }
@@ -344,6 +353,7 @@
   <section class="panel kurvor">
     <div class="kurv-rad">
       <h2 id="kurv-titel">Blodglukos (mmol/l)</h2>
+      <select id="kurv-val" hidden aria-label="Storhet i diagrammet"></select>
       <span class="forklaring"><i style="border-color:var(--glukos)"></i> modell</span>
       <span class="forklaring" id="ford-frisk" hidden><i class="streck" style="border-color:var(--text-dim)"></i> frisk, samma händelser</span>
       <span class="forklaring" id="ford-pred" hidden><i class="streck" style="border-color:var(--accent2)"></i> din förutsägelse</span>
@@ -364,6 +374,7 @@
     <li>Klicka på en komponent i kretsen för att läsa om den. I Sandlådan går den att ändra med reglage.</li>
     <li>Dra i kurvorna för att bläddra i tiden. Mellanslag startar och pausar, pilarna stegar.</li>
     <li>I uppdragen ritar du först en förutsägelse i blodglukoskurvan.</li>
+    <li>I <b>Fritt bygge</b> börjar du på en tom duk (eller från en färdig krets) och lägger till egna storheter, källor, förluster, ventiler, sensorer och signaler. Dra rören själv: en ventil tar från en storhet och ger till en annan. Lägg in störningar vid vald tid och läs rapporten.</li>
     <li>I Bygg lägger du till komponenter och kopplar dem: dra från ● till en annan komponent. Klicka på ett + eller − för att vända tecknet. Kretsen bedöms på hur den beter sig i varje situation, så flera olika kopplingar kan vara rätt. Delete tar bort det som är markerat.</li>
   </ul>
   <p class="dim">Förenklad modell för att visa principen, inte mätdata och inte råd om behandling. Kroppen har fler hormoner och reserver än de som visas här.</p>
@@ -426,8 +437,8 @@ const Motor = (() => {
     const storheter = typ(def, 'storhet'), sensorer = typ(def, 'sensor'), signaler = typ(def, 'signal');
     const effektorer = typ(def, 'effektor'), stornings = typ(def, 'storning');
 
-    const X = {}, H = {}, D = {}, POOL = {}, belast = {};
-    for (const s of storheter) X[s.id] = s.start;
+    const X = {}, H = {}, D = {}, POOL = {}, belast = {}, TAK = {};
+    for (const s of storheter) { X[s.id] = s.start; TAK[s.id] = s.max !== undefined ? s.max : Infinity; }
     // En sensor utan en storhet att läsa av är overksam (en krets som ännu byggs).
     const akt = s => (s && s.mot ? P[s.id].funk * sig(P[s.id].dir * (X[s.mot] - P[s.id].trosk) / P[s.id].bredd) : 0);
     for (const sg of signaler) { H[sg.id] = akt(def.noder.find(n => n.id === sg.fran)); D[sg.id] = 0; }
@@ -476,7 +487,7 @@ const Motor = (() => {
         for (const ef of effektorer) { ser[ef.id][i] = rate[ef.id]; ser['oppen:' + ef.id][i] = oppen[ef.id]; }
         for (const st of stornings) { ser[st.id][i] = ab[st.id]; ser['pool:' + st.id][i] = POOL[st.id]; }
       }
-      for (const id in X) X[id] = Math.max(0, X[id] + dt * dX[id]);
+      for (const id in X) X[id] = Math.min(TAK[id], Math.max(0, X[id] + dt * dX[id]));
       for (const st of stornings) POOL[st.id] = Math.max(0, POOL[st.id] - dt * ab[st.id]);
     }
 
@@ -495,9 +506,9 @@ const Motor = (() => {
       const t = i * dt;
       while (ei < ev.length && ev[ei].t <= t + 1e-9) {
         const e = ev[ei++];
-        if (e.typ === 'maltid') POOL[e.mal || stornings[0].id] += e.storlek;
-        else if (e.typ === 'dos') D[e.mal || 'insulin'] += e.storlek;
-        else if (e.typ === 'tillskott') POOL[e.mal] += e.storlek;
+        if (e.typ === 'maltid') { const m = e.mal || (stornings[0] && stornings[0].id); if (POOL[m] !== undefined) POOL[m] += e.storlek; }
+        else if (e.typ === 'dos') { const m = e.mal || 'insulin'; if (D[m] !== undefined) D[m] += e.storlek; }
+        else if (e.typ === 'tillskott') { if (POOL[e.mal] !== undefined) POOL[e.mal] += e.storlek; }
         else if (e.typ === 'motion' || e.typ === 'belastning') belast[e.mal || 'forb'] = { faktor: e.faktor, till: t + e.langd };
         else if (e.typ === 'par') satt(P, e.nyckel, e.varde);
       }
@@ -731,7 +742,7 @@ const LASTNOT = 'Låst i uppdraget. Sandlådan har reglage.';
 const KROPPSTEMP = {
   id: 'temp', namn: 'Temperaturreglering', dt: 0.5,
   noder: [
-    { id: 'sol', typ: 'storning', namn: 'Värmebelastning', till: 'T', par: { kabs: 0.05 }, vis: { max: 3 } },
+    { id: 'sol', typ: 'storning', namn: 'Värmebelastning', till: 'T', par: { kabs: 0.05 }, vis: { max: 3 }, storlekar: [1.2, 2.4, 4] },
     { id: 'T', typ: 'storhet', namn: 'Kroppstemperatur', start: 37, vis: { min: 35, max: 39, enhet: '°C', dec: 1, b: 240, h: 130, farg: '--blod' } },
     { id: 'metab', typ: 'effektor', namn: 'Ämnesomsättning', fran: null, till: 'T', signal: null, par: { kap: 0.02, km: 1 } },
     { id: 'forlust', typ: 'effektor', namn: 'Värmeförlust', fran: 'T', till: null, signal: null, par: { kap: 0.04, km: 37 } },
@@ -747,7 +758,7 @@ const KROPPSTEMP = {
 // Delar av blodsockersystemet får utseende och plats i byggläget.
 Object.assign(BLODSOCKER.noder.find(n => n.id === 'G'), { vis: { min: 0, max: 16, enhet: 'mmol/l', dec: 1, b: 240, h: 130, farg: '--blod' } });
 Object.assign(BLODSOCKER.noder.find(n => n.id === 'F'), { vis: { min: 0, max: 100, enhet: '', dec: 0, b: 240, h: 90, farg: '--glukos', fyllning: true } });
-Object.assign(BLODSOCKER.noder.find(n => n.id === 'mage'), { vis: { max: 12 } });
+Object.assign(BLODSOCKER.noder.find(n => n.id === 'mage'), { vis: { max: 12 }, storlekar: [5, 10, 16] });
 Object.assign(BLODSOCKER.noder.find(n => n.id === 'beta'), { farg: '--insulin', form: 'romb' });
 Object.assign(BLODSOCKER.noder.find(n => n.id === 'alfa'), { farg: '--glukagon', form: 'triangel' });
 Object.assign(BLODSOCKER.noder.find(n => n.id === 'insulin'), { form: 'romb' });
@@ -799,10 +810,38 @@ const BYGGSATSER = [
     ] },
 ];
 
+/* Mallar för fritt bygge (0.3): vad eleven kan lägga till på en tom duk. Värdena ger en krets som är
+   i jämvikt vid 50 när en källa (0,5) och en förlust (kapacitet 1,0, halvmättnad 50) kopplas till samma storhet. */
+const FRITT_MALLAR = {
+  storhet: { namn: 'Storhet', slag: 'Storhet', text: 'Något som kan öka och minska, till exempel en halt eller en temperatur. Namnge den själv.',
+    spec: { typ: 'storhet', start: 50, max: 100, vis: { min: 0, max: 100, enhet: '', dec: 0, b: 200, h: 110, farg: '--blod' } },
+    reglage: [{ nyckel: 'start', egenskap: true, etikett: 'Startvärde (börvärde)', min: 0, max: 100, steg: 1, enhet: '' }] },
+  storning: { namn: 'Tillskott', slag: 'Störning', text: 'Tillför något utifrån. Det tas upp i storheten under en stund efter att du lagt in det.',
+    spec: { typ: 'storning', par: { kabs: 0.05 }, vis: { max: 60 } },
+    reglage: [{ nyckel: 'kabs', etikett: 'Upptagshastighet', min: 1, max: 15, steg: 1, enhet: '% per min', faktor: 0.01 }] },
+  kalla: { namn: 'Källa', slag: 'Effektor', text: 'Tillför hela tiden till en storhet, oberoende av allt annat. Koppla den till en storhet.',
+    spec: { typ: 'effektor', fran: null, till: null, signal: null, ingenFran: true, par: { kap: 0.5, km: 1 } },
+    reglage: [{ nyckel: 'kap', etikett: 'Flöde', min: 0, max: 2, steg: 0.05, enhet: 'per min' }] },
+  forlust: { namn: 'Förlust', slag: 'Effektor', text: 'Tar hela tiden bort något från en storhet, mer ju mer det finns. Koppla en storhet till den.',
+    spec: { typ: 'effektor', fran: null, till: null, signal: null, ingenTill: true, par: { kap: 1.0, km: 50 } },
+    reglage: [{ nyckel: 'kap', etikett: 'Flöde', min: 0, max: 3, steg: 0.05, enhet: 'per min' }] },
+  ventil: { namn: 'Ventil', slag: 'Effektor', text: 'Flyttar något från en storhet till en annan, eller in i eller ut ur kretsen. Ett signalämne styr hur mycket den öppnas.',
+    spec: { typ: 'effektor', fran: null, till: null, reglerad: true, par: { kap: 1.5, bas: 0, km: 50, dir: 1 } },
+    reglage: [{ nyckel: 'kap', etikett: 'Kapacitet', min: 0, max: 4, steg: 0.1, enhet: 'per min' }, { nyckel: 'bas', etikett: 'Basal öppning', min: 0, max: 1, steg: 0.05, enhet: '' }] },
+  sensor: { namn: 'Sensor', slag: 'Sensor', text: 'Känner av en storhet och blir aktiv när värdet passerar tröskeln. Tecknet på kopplingen bestämmer om den aktiveras av högt eller lågt värde.',
+    spec: { typ: 'sensor', par: { funk: 1, trosk: 58, bredd: 4, dir: 1 } },
+    reglage: [{ nyckel: 'funk', etikett: 'Fungerande celler', min: 0, max: 100, enhet: '%', skala: 1 }, { nyckel: 'trosk', etikett: 'Tröskel', min: 0, max: 100, steg: 1, enhet: '' }, { nyckel: 'bredd', etikett: 'Känslighetsbredd', min: 1, max: 20, steg: 1, enhet: '' }] },
+  signal: { namn: 'Signalämne', slag: 'Signalämne', text: 'Följer en sensors aktivitet med en fördröjning och styr en ventil.',
+    spec: { typ: 'signal', par: { fordr: 8, tau: 60 } },
+    reglage: [{ nyckel: 'fordr', etikett: 'Fördröjning', min: 1, max: 60, steg: 1, enhet: 'min' }] },
+};
+const FRITT_FARGER = [['--insulin', 'romb'], ['--glukagon', 'triangel'], ['--warm', 'rund'], ['--positiv', 'romb'], ['--accent2', 'triangel']];
+
 /* Byggmodellen: ren logik utan DOM. Ett bygge är { noder: {id: {x, y}}, par: {id: {…}}, kopplingar: [{fran, till}] }. */
 const ByggeModell = (() => {
   const spec = (task, id) => task.system.noder.find(n => n.id === id);
   const kopia = o => JSON.parse(JSON.stringify(o));
+  const FLODTYP = new Set(['tar', 'ger', 'tillfor']);
 
   function nytt(task) {
     const B = { noder: {}, par: {}, kopplingar: [] };
@@ -816,7 +855,7 @@ const ByggeModell = (() => {
     return p.dir !== undefined ? p.dir : (spec(task, id).par.dir !== undefined ? spec(task, id).par.dir : 1);
   };
   // Tecken kan vändas på det en sensor känner av och på det en signal gör med en reglerbar effektor.
-  const kanVandas = (task, k) => { const s = spec(task, k.till); return s.typ === 'sensor' || (s.typ === 'effektor' && !!s.reglerad); };
+  const kanVandas = (task, k) => { const s = spec(task, k.till); return s.typ === 'sensor' || (s.typ === 'effektor' && !!s.reglerad && !FLODTYP.has(pariTyp(task, k.fran, k.till))); };
   const tecknet = (task, B, k) => (kanVandas(task, k) ? (dirAv(task, B, k.till) < 0 ? -1 : 1) : 1);
 
   function pariTyp(task, fran, till) {
@@ -824,33 +863,57 @@ const ByggeModell = (() => {
     if (a === 'storhet' && b === 'sensor') return 'avkanning';
     if (a === 'sensor' && b === 'signal') return 'styr';
     if (a === 'signal' && b === 'effektor') return 'verkar';
+    if (task.fritt) {
+      if (a === 'storhet' && b === 'effektor') return 'tar';
+      if (a === 'effektor' && b === 'storhet') return 'ger';
+      if (a === 'storning' && b === 'storhet') return 'tillfor';
+    }
     return null;
   }
+  const arFlode = (task, k) => FLODTYP.has(pariTyp(task, k.fran, k.till));
 
   function kontrolleraKoppling(task, B, fran, till) {
     if (!B.noder[fran] || !B.noder[till]) return { ok: false, msg: 'Båda komponenterna måste ligga i kretsen.' };
     if (fran === till) return { ok: false, msg: 'En komponent kan inte kopplas till sig själv.' };
-    const a = spec(task, fran).typ, b = spec(task, till).typ;
-    if (a === 'effektor' || a === 'storning') return { ok: false, msg: 'Flödet från den här komponenten är redan inritat. Koppla från en storhet, sensor eller signal.' };
+    const sa = spec(task, fran), sb = spec(task, till), a = sa.typ, b = sb.typ;
     const typ = pariTyp(task, fran, till);
-    if (typ === 'verkar' && !spec(task, till).reglerad) return { ok: false, msg: 'Den här ventilen går inte att styra.' };
     if (!typ) {
-      if (a === 'storhet') return { ok: false, msg: 'En storhet kopplas till en sensor som känner av den.' };
+      if (!task.fritt && (a === 'effektor' || a === 'storning')) return { ok: false, msg: 'Flödet från den här komponenten är redan inritat. Koppla från en storhet, sensor eller signal.' };
+      if (a === 'effektor') return { ok: false, msg: 'En ventil ger till en storhet.' };
+      if (a === 'storning') return { ok: false, msg: 'En störning tillför en storhet.' };
+      if (a === 'storhet') return { ok: false, msg: task.fritt ? 'En storhet kopplas till en sensor som känner av den, eller till en ventil som tar från den.' : 'En storhet kopplas till en sensor som känner av den.' };
       if (a === 'sensor') return { ok: false, msg: 'En sensor styr ett signalämne.' };
       return { ok: false, msg: 'Ett signalämne verkar på en effektor.' };
     }
+    if (typ === 'verkar' && !sb.reglerad) return { ok: false, msg: 'Den här ventilen går inte att styra.' };
+    if (typ === 'tar' && sb.ingenFran) return { ok: false, msg: 'En källa tar inte från någon storhet.' };
+    if (typ === 'ger' && sa.ingenTill) return { ok: false, msg: 'En förlust ger inte till någon storhet.' };
     return { ok: true, typ };
+  }
+
+  // I fritt bygge ligger rören (vad en ventil tar från och ger till) i kopplingarna; de skrivs till komponenterna.
+  function synkaFlode(task, B) {
+    if (!task.fritt) return;
+    for (const s of task.system.noder) { if (s.typ === 'effektor') { s.fran = null; s.till = null; } if (s.typ === 'storning') s.till = null; }
+    for (const k of B.kopplingar) {
+      const t = pariTyp(task, k.fran, k.till);
+      if (t === 'tar') spec(task, k.till).fran = k.fran;
+      else if (t === 'ger' || t === 'tillfor') spec(task, k.fran).till = k.till;
+    }
   }
 
   function koppla(task, B, fran, till) {
     const k = kontrolleraKoppling(task, B, fran, till);
     if (!k.ok) return k;
     if (B.kopplingar.some(x => x.fran === fran && x.till === till)) return { ok: false, msg: 'De är redan kopplade.' };
-    // En sensor läser av en storhet, en signal styrs av en sensor, en effektor styrs av en signal.
-    const gammal = B.kopplingar.findIndex(x => x.till === till);
+    // En sensor läser av en storhet, en signal styrs av en sensor, en effektor styrs av en signal,
+    // och en ventil tar från och ger till högst en storhet var.
+    const utgaende = k.typ === 'ger' || k.typ === 'tillfor';
+    const gammal = B.kopplingar.findIndex(x => pariTyp(task, x.fran, x.till) === k.typ && (utgaende ? x.fran === fran : x.till === till));
     let msg = '';
     if (gammal >= 0) { B.kopplingar.splice(gammal, 1); msg = 'Den tidigare kopplingen ersattes.'; }
     B.kopplingar.push({ fran, till });
+    synkaFlode(task, B);
     return { ok: true, msg, typ: k.typ };
   }
 
@@ -861,7 +924,7 @@ const ByggeModell = (() => {
     sattDir(task, B, k.till, dirAv(task, B, k.till) < 0 ? 1 : -1);
     return true;
   }
-  function taBortKoppling(B, i) { B.kopplingar.splice(i, 1); }
+  function taBortKoppling(task, B, i) { B.kopplingar.splice(i, 1); synkaFlode(task, B); }
   function laggTill(task, B, id, x, y) {
     if (B.noder[id]) return false;
     const p = task.plats[id];
@@ -872,7 +935,73 @@ const ByggeModell = (() => {
     if (task.fasta.includes(id)) return false;
     delete B.noder[id]; delete B.par[id];
     B.kopplingar = B.kopplingar.filter(k => k.fran !== id && k.till !== id);
+    if (task.fritt) { const i = task.system.noder.findIndex(n => n.id === id); if (i >= 0) task.system.noder.splice(i, 1); synkaFlode(task, B); }
     return true;
+  }
+
+  // ---- fritt bygge: nya komponenter, startplatser och mallar
+  function nyttFritt() {
+    const task = {
+      id: 'fritt', rubrik: 'Fritt bygge', fritt: true, system: { id: 'fritt', namn: 'Eget system', dt: 0.5, noder: [] },
+      fasta: [], palett: [], plats: {}, raknare: 0, enhet: '', dec: 0, huvud: null, ymin: 0, ymax: 100, bord: null, band: null,
+      scenarier: [{ id: 'prov', namn: 'Provkörning', hand: [], langd: 360, krav: [] }], tips: [],
+    };
+    return { task, B: nytt(task) };
+  }
+  // Föredragna platser per sort, så att en nybyggd krets blir läsbar: tillflöden till vänster, förluster till höger,
+  // sensorer överst, signaler vid sidorna och ventiler under storheten.
+  const PREF = {
+    storhet: [[480, 250], [480, 450], [170, 450], [790, 450]],
+    kalla: [[110, 250], [110, 380], [110, 460]], forlust: [[860, 250], [860, 380], [860, 460]],
+    storning: [[110, 110], [860, 110], [110, 330]],
+    sensor: [[330, 75], [630, 75], [160, 75], [800, 75]],
+    signal: [[215, 335], [745, 335], [215, 425], [745, 425]],
+    ventil: [[405, 390], [555, 390], [300, 480], [660, 480]],
+  };
+  const RESERV = [[170, 100], [480, 100], [790, 100], [170, 250], [790, 250], [170, 400], [480, 400], [790, 400], [330, 175], [630, 175], [330, 325], [630, 325]];
+  function lediPlats(B, mall, typ) {
+    const nara = (x, y, d) => Object.values(B.noder).every(n => Math.hypot(n.x - x, n.y - y) >= d);
+    for (const [x, y] of (PREF[mall] || [])) if (nara(x, y, 80)) return [x, y];
+    for (const [x, y] of RESERV) if (nara(x, y, typ === 'storhet' ? 160 : 90)) return [x, y];
+    return [120 + Math.random() * 720, 70 + Math.random() * 400];
+  }
+  function nyInstans(task, B, mall) {
+    const M = FRITT_MALLAR[mall], n = ++task.raknare, id = mall + n;
+    const s = kopia(M.spec);
+    s.id = id; s.mall = mall; s.namn = M.namn + ' ' + (task.system.noder.filter(x => x.mall === mall).length + 1);
+    if (mall === 'sensor' || mall === 'signal') {
+      const f = FRITT_FARGER[(task.system.noder.filter(x => x.mall === mall).length) % FRITT_FARGER.length];
+      if (mall === 'sensor') { s.farg = f[0]; s.form = f[1]; } else s.form = f[1];
+    }
+    if (mall === 'storhet') { s.vis.farg = ['--blod', '--warm', '--accent', '--glukagon'][task.system.noder.filter(x => x.mall === 'storhet').length % 4]; }
+    task.system.noder.push(s);
+    const [x, y] = lediPlats(B, mall, s.typ);
+    task.plats[id] = [x, y]; B.noder[id] = { x, y };
+    if (!task.huvud && s.typ === 'storhet') task.huvud = id;
+    return id;
+  }
+  // Börja från en färdig krets: alla delar läggs ut och kopplas som i den färdiga byggsatsen.
+  function franMall(namn) {
+    const m = MALLAR[namn], { task, B } = nyttFritt();
+    task.rubrik = 'Fritt bygge: ' + m.namn;
+    for (const n of m.system.noder) {
+      const s = kopia(n); s.mall = null;
+      delete s.mot; if (s.typ === 'signal') delete s.fran;
+      if (s.typ === 'effektor' && s.reglerad) delete s.signal;
+      if (s.typ === 'storhet') s.max = s.vis.max;
+      task.system.noder.push(s); task.plats[s.id] = m.plats[s.id].slice(); B.noder[s.id] = { x: m.plats[s.id][0], y: m.plats[s.id][1] };
+    }
+    // flödeskopplingar ur komponenternas egna tillgångar
+    for (const n of m.system.noder) {
+      if (n.typ === 'effektor') { if (n.fran) B.kopplingar.push({ fran: n.fran, till: n.id }); if (n.till) B.kopplingar.push({ fran: n.id, till: n.till }); }
+      if (n.typ === 'storning') B.kopplingar.push({ fran: n.id, till: n.till });
+    }
+    for (const [a, b] of m.kopp) B.kopplingar.push({ fran: a, till: b });
+    for (const id in m.par) B.par[id] = Object.assign({}, m.par[id]);
+    task.huvud = m.huvud; task.mallhuvud = m.huvud; task.ymin = m.ymin; task.ymax = m.ymax; task.bord = m.bord; task.band = m.band; task.enhet = m.enhet; task.dec = m.dec;
+    task.scenarier[0].langd = m.langd;
+    synkaFlode(task, B);
+    return { task, B };
   }
 
   // Bygget omvandlas till ett system som motorn kan köra.
@@ -885,6 +1014,8 @@ const ByggeModell = (() => {
       if (c.typ === 'sensor') { delete c.mot; }
       if (c.typ === 'signal') { delete c.fran; }
       if (c.typ === 'effektor' && c.signal !== undefined && n.signal !== null) delete c.signal;
+      if (c.typ === 'effektor') { if (c.fran && !B.noder[c.fran]) c.fran = null; if (c.till && !B.noder[c.till]) c.till = null; }
+      if (c.typ === 'storning' && c.till && !B.noder[c.till]) c.till = null;
       noder.push(c);
     }
     const nod = id => noder.find(n => n.id === id);
@@ -918,12 +1049,37 @@ const ByggeModell = (() => {
   function utvardera(task, B) {
     const def = bygDef(task, B);
     const res = task.scenarier.map(sc => {
-      const run = Motor.kor(def, { start: {}, hand: sc.hand, langd: sc.langd, forkorning: false });
-      const y = run.ser[task.huvud];
+      const run = Motor.kor(def, { start: {}, hand: sc.hand.filter(e => !e.mal || B.noder[e.mal]), langd: sc.langd, forkorning: false });
+      const y = task.huvud && run.ser[task.huvud] ? run.ser[task.huvud] : new Float32Array(run.n + 1);
       const krav = sc.krav.map(k => Object.assign({ text: k.text }, mat(k, y, run.dt, task.enhet, task.dec)));
       return { id: sc.id, namn: sc.namn, run, krav, ok: krav.every(k => k.ok) };
     });
     return { def, scen: res, antalOk: res.filter(r => r.ok).length, alla: res.every(r => r.ok) };
+  }
+
+  // Rapport för fritt bygge: vad hände med varje storhet under provkörningen?
+  function rapport(def, run) {
+    const ut = [];
+    for (const n of def.noder) {
+      if (n.typ !== 'storhet') continue;
+      const y = run.ser[n.id], v = n.vis || {}, spann = (v.max !== undefined ? v.max : 100) - (v.min || 0), tol = 0.05 * spann;
+      let mx = -Infinity, mn = Infinity;
+      for (const q of y) { if (q > mx) mx = q; if (q < mn) mn = q; }
+      const fn = Math.round(30 / run.dt); let s = 0; for (let i = y.length - fn; i < y.length; i++) s += y[i];
+      const slut = s / fn, start = y[0];
+      // antal tydliga vändpunkter (svängning)
+      let vandor = 0, dir = 0, ref = y[0];
+      for (const q of y) { if (dir >= 0 && q < ref - tol) { if (dir === 1) vandor++; dir = -1; ref = q; } else if (dir <= 0 && q > ref + tol) { if (dir === -1) vandor++; dir = 1; ref = q; } else if ((dir === 1 && q > ref) || (dir === -1 && q < ref)) ref = q; }
+      let dom;
+      const tak = n.max !== undefined ? n.max : Infinity;
+      if (mx >= tak - 0.5 && slut >= tak - 0.5 * tol * 2) dom = 'nar-taket';
+      else if (mn <= 0.5 && slut <= 0.5) dom = 'tomms';
+      else if (vandor >= 4 && Math.abs(slut - start) <= 2 * tol) dom = 'svanger';
+      else if (Math.abs(slut - start) <= tol) dom = 'haller';
+      else dom = 'ny-niva';
+      ut.push({ id: n.id, namn: n.namn, start, topp: mx, lagst: mn, slut, dom, enhet: v.enhet || '' });
+    }
+    return ut;
   }
 
   // En färdig krets i form av kopplingslistor, för tester och tips.
@@ -935,8 +1091,16 @@ const ByggeModell = (() => {
     return B;
   }
 
-  return { nytt, koppla, kontrolleraKoppling, vandTecken, taBortKoppling, laggTill, taBort, bygDef, utvardera, tecknet, kanVandas, dirAv, sattDir, bygg, spec };
+  return { nytt, koppla, kontrolleraKoppling, vandTecken, taBortKoppling, laggTill, taBort, bygDef, utvardera, tecknet, kanVandas, dirAv, sattDir, bygg, spec, nyttFritt, nyInstans, franMall, rapport, arFlode, pariTyp, synkaFlode };
 })();
+
+// Färdiga kretsar att börja från i fritt bygge.
+const MALLAR = {
+  blodsocker: { namn: 'blodsocker', system: BLODSOCKER, plats: BYGGSATSER[0].plats, huvud: 'G', ymin: 0, ymax: 16, bord: 5, band: [4, 6], enhet: 'mmol/l', dec: 1, langd: 360, par: {},
+    kopp: [['G', 'beta'], ['beta', 'insulin'], ['insulin', 'upptag'], ['G', 'alfa'], ['alfa', 'glukagon'], ['glukagon', 'friset']] },
+  temp: { namn: 'kroppstemperatur', system: KROPPSTEMP, plats: BYGGSATSER[1].plats, huvud: 'T', ymin: 35, ymax: 39, bord: 37, band: [36.5, 37.5], enhet: '°C', dec: 1, langd: 300, par: {},
+    kopp: [['T', 'varmres'], ['varmres', 'sigA'], ['sigA', 'svett'], ['T', 'kallres'], ['kallres', 'sigB'], ['sigB', 'rys']] },
+};
 
 /* =========================================================================
    Vy: kretsen som SVG, med flödande partiklar. Ritas en gång; varje bildruta
@@ -1495,6 +1659,7 @@ const ByggeVy = (() => {
     // kopplingar (sensorer, signaler, effektorer)
     const kg = E('g', {}, svg), bg = E('g', {}, svg);
     B.kopplingar.forEach((k, i) => {
+      if (ByggeModell.arFlode(task, k)) return;      // rören (tar från, ger till, tillför) ritas som rör ovan
       const a = mitt(k.fran), b = mitt(k.till), pa = rand(k.fran, b), pb = rand(k.till, a);
       const p = d([pa, pb]);
       const g = E('g', { class: 'bkant-g' }, kg);
@@ -1511,13 +1676,14 @@ const ByggeVy = (() => {
 
     // lysande kanter för slingor (läggs över kopplingar)
     R.kantOv = {};
-    B.kopplingar.forEach((k, i) => { R.kantOv[k.fran + '>' + k.till] = E('path', { d: d([rand(k.fran, mitt(k.till)), rand(k.till, mitt(k.fran))]), class: 'blys' }, ov); });
+    B.kopplingar.forEach((k, i) => { if (ByggeModell.arFlode(task, k)) return; R.kantOv[k.fran + '>' + k.till] = E('path', { d: d([rand(k.fran, mitt(k.till)), rand(k.till, mitt(k.fran))]), class: 'blys' }, ov); });
     for (const k in R.flodOv) R.kantOv[k] = E('path', { d: d(R.flodOv[k]), class: 'blys' }, ov);
 
     // komponenter
     const ng = E('g', {}, svg);
     for (const id in B.noder) nod(ng, id);
 
+    if (!Object.keys(B.noder).length) T('Lägg till komponenter från listan till vänster.', { x: 480, y: 270, 'text-anchor': 'middle', 'font-size': 18, class: 't-dim' }, svg);
     R.partGrp = E('g', { 'pointer-events': 'none' }, svg);
     R.tradd = E('path', { class: 'btradd', d: '', opacity: 0 }, svg);
     R.medd = T('', { x: 480, y: 22, 'text-anchor': 'middle', 'font-size': 15, class: 'bmedd', opacity: 0 }, svg);
@@ -1539,13 +1705,14 @@ const ByggeVy = (() => {
       E('rect', { x: -z.b / 2, y: -z.h / 2, width: z.b, height: z.h, rx: 8, class: 'vagg' }, gg);
       const cp = E('clipPath', { id: 'k-' + id }, gg); E('rect', { x: -z.b / 2 + 2, y: -z.h / 2 + 2, width: z.b - 4, height: z.h - 4 }, cp);
       const inre = E('g', { 'clip-path': `url(#k-${id})` }, gg);
-      if (task.band && id === task.huvud) {
+      if (task.band && id === (task.fritt ? task.mallhuvud : task.huvud)) {
         const f = x => z.h / 2 - 2 - (z.h - 4) * (x - v.min) / (v.max - v.min);
         E('rect', { x: -z.b / 2, y: f(task.band[1]), width: z.b, height: f(task.band[0]) - f(task.band[1]), class: 'band' }, inre);
       }
       r.nivå = E('rect', { x: -z.b / 2, width: z.b, class: v.fyllning ? 'fyll' : 'vatska' }, inre);
-      if (task.bord != null && id === task.huvud) {
-        const yb = z.h / 2 - 2 - (z.h - 4) * (task.bord - v.min) / (v.max - v.min);
+      if ((task.bord != null && id === task.huvud) || task.fritt) {
+        const bv = task.fritt ? (task.mallhuvud === id && task.bord != null ? task.bord : s.start) : task.bord;
+        const yb = z.h / 2 - 2 - (z.h - 4) * (bv - v.min) / (v.max - v.min);
         E('line', { x1: -z.b / 2, x2: z.b / 2, y1: yb, y2: yb, class: 'bord' }, gg);
         T('börvärde', { x: z.b / 2 - 8, y: yb - 4, 'text-anchor': 'end', 'font-size': 12, class: 't-dim box-text' }, gg);
       }
@@ -1558,6 +1725,7 @@ const ByggeVy = (() => {
       E('rect', { x: -z.b / 2, y: -z.h / 2, width: z.b, height: z.h, rx: 12, class: 'box' }, gg);
       r.nivå = E('rect', { x: -z.b / 2 + 2, width: z.b - 4, class: 'fyll' }, gg);
       T(s.namn, { x: 0, y: 5, 'text-anchor': 'middle', 'font-size': 14, class: 'box-text' }, gg);
+      if (task.fritt) port(gg, z.b / 2, 0, id);
     } else if (s.typ === 'sensor') {
       E('circle', { class: 'bram', r: z.r + 8 }, gg);
       r.glod = E('circle', { r: z.r + 6, fill: farg(id), opacity: 0 }, gg);
@@ -1579,11 +1747,13 @@ const ByggeVy = (() => {
       E('rect', { class: 'bram', x: -z.b / 2 - 6, y: -z.h / 2 - 6, width: z.b + 12, height: z.h + 12, rx: 12 }, gg);
       E('rect', { x: -z.b / 2, y: -z.h / 2, width: z.b, height: z.h, rx: 12, class: 'box' }, gg);
       T(s.namn, { x: 0, y: 5, 'text-anchor': 'middle', 'font-size': 14, class: 'box-text' }, gg);
+      if (task.fritt && !s.ingenTill) port(gg, z.b / 2, 0, id);
     } else {
       E('circle', { class: 'bram', r: z.r + 8 }, gg);
       E('circle', { r: z.r, class: 'ventil' }, gg);
       r.stav = E('line', { x1: 0, y1: -13, x2: 0, y2: 13, class: 'ventilstav' }, gg);
       T(s.namn, { x: 0, y: z.r + 20, 'text-anchor': 'middle', 'font-size': 14, class: 't-fet box-text' }, gg);
+      if (task.fritt) port(gg, z.r, 0, id);
     }
   }
 
@@ -1739,7 +1909,7 @@ const App = (() => {
     huvud: 'G', horm: ['insulin', 'glukagon'], enhet: 'mmol/l', dec: 1,
     cursor: 0, spelar: false, fart: 6, harSpelat: false, slut: false,
     pred: [], ritar: false, vald: 'beta', flik: 'komp', visaSling: false, svarat: false,
-    task: null, B: null, utv: null, scen: null, tips: 0, parN: -1,
+    task: null, B: null, utv: null, scen: null, tips: 0, parN: -1, fhand: [], hTid: 30,
   };
   const $ = id => document.getElementById(id);
   let dg, dh, sistaIdx = -1, senast = 0;
@@ -1762,12 +1932,20 @@ const App = (() => {
   }
   function raknaBygg() {
     const t = S.task;
+    if (t.fritt) {
+      // Händelser på komponenter som tagits bort kastas, och diagrammet visar en storhet som finns.
+      for (let i = S.fhand.length - 1; i >= 0; i--) if (S.fhand[i].mal && !S.B.noder[S.fhand[i].mal]) S.fhand.splice(i, 1);
+      const sid = t.system.noder.filter(n => n.typ === 'storhet' && S.B.noder[n.id]).map(n => n.id);
+      if (!sid.includes(t.huvud)) t.huvud = sid[0] || null;
+    }
     S.utv = ByggeModell.utvardera(t, S.B);
     S.def = S.utv.def;
     const sc = S.utv.scen.find(x => x.id === S.scen) || S.utv.scen[0];
     S.scen = sc.id; S.main = sc.run; S.frisk = null; S.bord = t.bord;
     S.hand = t.scenarier.find(x => x.id === sc.id).hand;
     S.huvud = t.huvud; S.enhet = t.enhet; S.dec = t.dec;
+    if (!S.huvud) { S.main.ser._tom = new Float32Array(S.main.n + 1); S.huvud = '_tom'; }
+    else if (t.fritt) { const v = ByggeModell.spec(t, S.huvud).vis || {}; S.enhet = v.enhet || ''; S.dec = v.dec || 0; }
     S.horm = S.def.noder.filter(n => n.typ === 'signal').map(n => n.id);
   }
   const parNu = () => (bygg() ? Motor.grundpar(S.def) : Motor.parVid(S.def, S.start, S.hand, S.cursor));
@@ -1781,6 +1959,7 @@ const App = (() => {
   }
 
   function valjUppdrag(id) {
+    if (id === 'fritt') return valjFritt('tom');
     const t = BYGGSATSER.find(x => x.id === id);
     if (t) return valjBygge(t);
     const u = UPPDRAG.find(x => x.id === id) || UPPDRAG[0];
@@ -1804,6 +1983,19 @@ const App = (() => {
     byggKort(); byggKortBygg(); ritaAllt(); uppdatera(true); visaFlik('komp');
   }
 
+  // Fritt bygge: en tom duk, eller en färdig krets att ändra på.
+  function valjFritt(mall) {
+    const { task, B } = mall === 'tom' ? ByggeModell.nyttFritt() : ByggeModell.franMall(mall);
+    S.mode = 'bygg'; S.task = task; S.B = B; S.fhand = task.scenarier[0].hand; S.scen = 'prov'; S.tips = 0;
+    S.spelar = false; S.harSpelat = true; S.slut = false; S.pred = []; S.ritar = false; S.svarat = false; S.visaSling = false; S.flik = 'komp'; S.hTid = 30;
+    $('valj-uppdrag').value = 'fritt';
+    ByggeVy.rensaPartiklar(); Vy.rensaPartiklar();
+    visaLage();
+    ByggeVy.start(task, B);
+    raknaBygg(); S.cursor = S.main.langd; sistaIdx = -1;
+    byggKort(); byggKortBygg(); ritaAllt(); uppdatera(true); visaFlik('komp');
+  }
+
   // Efter att eleven ändrat bygget: räkna om, visa hela förloppet och uppdatera alla paneler.
   function efterByggandring(glid) {
     raknaBygg(); S.cursor = S.main.langd; S.spelar = false; S.slut = false;
@@ -1817,6 +2009,17 @@ const App = (() => {
   /* ---------- uppdragskort (Utforska) ---------- */
   function byggKort() {
     const k = $('uppdrag-kort'); k.innerHTML = '';
+    if (bygg() && S.task.fritt) {
+      mk(k, 'h2', '', 'Fritt bygge');
+      mk(k, 'p', 'uppgift', 'Bygg valfri reglerkrets på en tom duk, eller börja från en färdig krets och ändra den. Lägg in störningar och se hur kretsen reagerar.');
+      mk(k, 'p', 'dim', 'Dra från ● till en annan komponent för att koppla. Klicka på + eller − för att vända tecknet.');
+      mk(k, 'div', 'dim', 'Börja från').style.marginTop = '8px';
+      const r = mk(k, 'div', 'rad'); r.style.marginTop = '4px';
+      for (const [id, txt] of [['tom', 'Tom duk'], ['blodsocker', 'Blodsocker'], ['temp', 'Temperatur']]) {
+        const b = mk(r, 'button', 'knapp liten', txt); b.type = 'button'; b.dataset.mall = id; b.addEventListener('click', () => valjFritt(id));
+      }
+      return;
+    }
     if (bygg()) {
       const t = S.task;
       mk(k, 'h2', '', 'Bygg');
@@ -1957,8 +2160,14 @@ const App = (() => {
 
   /* ---------- byggläget: komponenter, situationer och resultat ---------- */
   const SLAG = { storhet: 'Storhet', sensor: 'Sensor', signal: 'Signalämne', effektor: 'Effektor', storning: 'Störning' };
+  // Hur en koppling läses i klartext, och hur ett val i rullgardinen beskrivs sett från den komponent man kopplar från.
+  const FRAS = { avkanning: (a, b) => `${b} känner av ${a.toLowerCase()}`, styr: (a, b) => `${a} styr ${b.toLowerCase()}`, verkar: (a, b) => `${a} verkar på ${b.toLowerCase()}`,
+    tar: (a, b) => `${b} tar från ${a.toLowerCase()}`, ger: (a, b) => `${a} ger till ${b.toLowerCase()}`, tillfor: (a, b) => `${a} tillför ${b.toLowerCase()}` };
+  const ALT = { avkanning: 'känner av den', styr: 'styrs av den', verkar: 'styrs av den', tar: 'tar från den', ger: 'tar emot', tillfor: 'tar emot' };
+  const infoFor = sp => (sp.mall ? FRITT_MALLAR[sp.mall] : (KOMPONENT[sp.id] || { slag: SLAG[sp.typ], text: '' }));
 
   function byggKortBygg() {
+    if (S.task.fritt) return byggKortFritt();
     const t = S.task, k = $('bygg-kort'); k.innerHTML = '';
     const ligger = id => !!S.B.noder[id];
     mk(k, 'h2', '', 'Komponenter');
@@ -2001,6 +2210,73 @@ const App = (() => {
 
   }
 
+
+  const DOM = { haller: 'håller sig kring börvärdet', 'ny-niva': 'hamnar på en ny nivå', 'nar-taket': 'skenar upp till taket', tomms: 'töms', svanger: 'svänger kring börvärdet' };
+  function byggKortFritt() {
+    const t = S.task, k = $('bygg-kort'); k.innerHTML = '';
+    mk(k, 'h2', '', 'Komponenter');
+    const pal = mk(k, 'div', 'palett rutnat');
+    for (const id of ['storhet', 'storning', 'kalla', 'forlust', 'ventil', 'sensor', 'signal']) {
+      const M = FRITT_MALLAR[id], b = mk(pal, 'button', 'del'); b.type = 'button'; b.dataset.nymall = id;
+      mk(b, 'span', 'del-typ', M.slag); mk(b, 'span', 'del-namn', '+ ' + M.namn);
+      b.addEventListener('click', () => { const nytt = ByggeModell.nyInstans(t, S.B, id); efterByggandring(); ByggeVy.valj({ typ: 'nod', id: nytt }); });
+    }
+
+    mk(k, 'h2', '', 'Störningar').style.marginTop = '12px';
+    const tid = mk(k, 'div', 'reglage');
+    const lab = mk(tid, 'label'); mk(lab, 'span', '', 'Tidpunkt'); const out = mk(lab, 'output', '', S.hTid + ' min');
+    const inp = mk(tid, 'input'); inp.type = 'range'; inp.min = 0; inp.max = 300; inp.step = 5; inp.value = S.hTid; inp.setAttribute('aria-label', 'Tidpunkt för störningen'); inp.id = 'h-tid';
+    inp.addEventListener('input', () => { S.hTid = +inp.value; out.textContent = S.hTid + ' min'; });
+    const nm = id => ByggeModell.spec(t, id).namn;
+    const stor = t.system.noder.filter(n => n.typ === 'storning' && S.B.noder[n.id]);
+    for (const st of stor) {
+      const g = mk(k, 'div', 'grupp'); mk(g, 'h3', '', 'Tillför ' + st.namn.toLowerCase());
+      const r = mk(g, 'div', 'rad');
+      const sz = st.storlekar || [10, 20, 40];
+      for (const [txt, v] of [['Liten', sz[0]], ['Medel', sz[1]], ['Stor', sz[2]]]) {
+        const b = mk(r, 'button', 'knapp liten', txt); b.type = 'button'; b.dataset.tillskott = st.id + ':' + v;
+        b.addEventListener('click', () => laggHandelse({ typ: 'tillskott', mal: st.id, storlek: v, etikett: 'Tillskott' }));
+      }
+    }
+    const eff = t.system.noder.filter(n => n.typ === 'effektor' && S.B.noder[n.id]);
+    if (eff.length) {
+      const g = mk(k, 'div', 'grupp'); mk(g, 'h3', '', 'Ändra flödet i 30 min');
+      const s1 = mk(g, 'select'); s1.id = 'bel-mal'; s1.setAttribute('aria-label', 'Vilket flöde');
+      for (const e of eff) { const o = mk(s1, 'option', '', e.namn); o.value = e.id; }
+      const s2 = mk(g, 'select'); s2.id = 'bel-faktor'; s2.setAttribute('aria-label', 'Hur mycket'); s2.style.marginLeft = '6px';
+      for (const [txt, v] of [['Stäng av', 0], ['Halvera', 0.5], ['Dubbla', 2], ['Tredubbla', 3]]) { const o = mk(s2, 'option', '', txt); o.value = v; }
+      s2.value = 3;
+      const b = mk(g, 'button', 'knapp liten', 'Lägg in'); b.type = 'button'; b.id = 'bel-knapp'; b.style.marginLeft = '6px';
+      b.addEventListener('click', () => laggHandelse({ typ: 'belastning', mal: s1.value, faktor: +s2.value, langd: 30, etikett: 'Flöde ×' + String(+s2.value).replace('.', ',') }));
+    }
+    if (!stor.length && !eff.length) mk(k, 'p', 'dim', 'Lägg till en störning eller en ventil för att kunna prova kretsen.');
+    if (S.fhand.length) {
+      const l = mk(k, 'ul', 'handelser');
+      S.fhand.forEach((e, i) => {
+        const li = mk(l, 'li'); mk(li, 'span', '', `${Math.round(e.t)} min: ${e.etikett} (${nm(e.mal)})`);
+        const x = mk(li, 'button', 'knapp liten', '✕'); x.type = 'button'; x.setAttribute('aria-label', 'Ta bort händelsen'); x.dataset.taBort = i;
+        x.addEventListener('click', () => { S.fhand.splice(i, 1); efterByggandring(); });
+      });
+      const r = mk(k, 'button', 'knapp liten', 'Rensa störningar'); r.type = 'button'; r.style.marginTop = '4px'; r.id = 'rensa-handelser';
+      r.addEventListener('click', () => { S.fhand.length = 0; efterByggandring(); });
+    }
+
+    mk(k, 'h2', '', 'Rapport').style.marginTop = '12px';
+    const rap = ByggeModell.rapport(S.def, S.main);
+    if (!rap.length) mk(k, 'p', 'dim', 'Ingen storhet i kretsen än.');
+    for (const r of rap) {
+      const d = mk(k, 'div', 'rapport ' + (r.dom === 'haller' ? 'ok' : 'fel'));
+      mk(d, 'b', '', r.namn + ': '); mk(d, 'span', '', DOM[r.dom]);
+      mk(d, 'div', 'dim', `start ${fmt(r.start, 0)} · högst ${fmt(r.topp, 0)} · lägst ${fmt(r.lagst, 0)} · slut ${fmt(r.slut, 0)}`);
+    }
+    mk(k, 'p', 'dim', 'Tryck Start för att se förloppet.').style.marginTop = '6px';
+  }
+
+  function laggHandelse(e) {
+    e.t = S.hTid; S.fhand.push(e); S.fhand.sort((a, b) => a.t - b.t);
+    efterByggandring(); if (!S.spelar) { S.cursor = 0; spela(); }
+  }
+
   function justNuBygg() {
     const e = $('just-nu'); if (!e) return;
     const v = ByggeVy.vald; if (!v || v.typ !== 'nod') return;
@@ -2027,7 +2303,10 @@ const App = (() => {
       m('div', 'komp-typ', 'Koppling'); m('div', 'komp-namn', `${nm(k.fran)} → ${nm(k.till)}`);
       const text = { avkanning: `${nm(k.till)} känner av ${nm(k.fran).toLowerCase()}. Tecknet säger om den aktiveras av ett högt eller ett lågt värde.`,
         styr: `${nm(k.fran)} styr ${nm(k.till).toLowerCase()}. Mer aktivitet ger mer signal, så tecknet är alltid +.`,
-        verkar: `${nm(k.fran)} verkar på ${nm(k.till).toLowerCase()}. Tecknet säger om mer signal ger mer eller mindre flöde.` }[typ];
+        verkar: `${nm(k.fran)} verkar på ${nm(k.till).toLowerCase()}. Tecknet säger om mer signal ger mer eller mindre flöde.`,
+        tar: `${nm(k.till)} tar från ${nm(k.fran).toLowerCase()}. Det är ett rör: det som tas bort från storheten flyttas.`,
+        ger: `${nm(k.fran)} ger till ${nm(k.till).toLowerCase()}. Det är ett rör: det som ges ökar storheten.`,
+        tillfor: `${nm(k.fran)} tillför ${nm(k.till).toLowerCase()} utifrån, när en störning läggs in.` }[typ];
       m('p', '', text).style.marginTop = '6px';
       if (ByggeModell.kanVandas(t, k)) {
         const dir = ByggeModell.dirAv(t, S.B, k.till), box = m('div', 'reglage');
@@ -2041,12 +2320,16 @@ const App = (() => {
       }
       const r = m('div', 'rad'); r.style.marginTop = '12px';
       const tb = mk(r, 'button', 'knapp liten', 'Ta bort kopplingen'); tb.type = 'button';
-      tb.addEventListener('click', () => { ByggeModell.taBortKoppling(S.B, v.idx); ByggeVy.valj(null); efterByggandring(); });
+      tb.addEventListener('click', () => { ByggeModell.taBortKoppling(t, S.B, v.idx); ByggeVy.valj(null); efterByggandring(); });
       return;
     }
 
-    const id = v.id, sp = ByggeModell.spec(t, id), info = KOMPONENT[id] || { slag: SLAG[sp.typ], text: '' };
-    m('div', 'komp-typ', SLAG[sp.typ]); m('div', 'komp-namn', sp.namn);
+    const id = v.id, sp = ByggeModell.spec(t, id), info = infoFor(sp);
+    m('div', 'komp-typ', SLAG[sp.typ]);
+    if (t.fritt) {
+      const n = m('input', 'namnfalt'); n.type = 'text'; n.value = sp.namn; n.maxLength = 24; n.id = 'komp-namn-falt'; n.setAttribute('aria-label', 'Namn');
+      n.addEventListener('input', () => { const nytt = n.value.trim(); if (nytt) { sp.namn = nytt; efterByggandring(true); } });
+    } else m('div', 'komp-namn', sp.namn);
     if (info.text) m('p', '', info.text).style.marginTop = '6px';
     m('div', 'just-nu').id = 'just-nu';
 
@@ -2054,34 +2337,38 @@ const App = (() => {
     const mina = S.B.kopplingar.map((k, i) => ({ k, i })).filter(x => x.k.fran === id || x.k.till === id);
     const kopp = m('div', 'grupp');
     mk(kopp, 'h3', '', 'Kopplingar');
-    if (!mina.length) mk(kopp, 'p', 'dim', ByggeModell.spec(t, id).typ === 'effektor' || ByggeModell.spec(t, id).typ === 'storning' ? 'Rören till och från den här komponenten är redan inritade.' : 'Inga kopplingar än.');
+    if (!mina.length) mk(kopp, 'p', 'dim', !t.fritt && (sp.typ === 'effektor' || sp.typ === 'storning') ? 'Rören till och från den här komponenten är redan inritade.' : 'Inga kopplingar än.');
     for (const { k, i } of mina) {
       const rad = mk(kopp, 'div', 'kopplingsrad');
       const tecken = ByggeModell.tecknet(t, S.B, k);
-      const lank = mk(rad, 'button', 'kopplingstext', `${nm(k.fran)} → ${nm(k.till)}`); lank.type = 'button';
+      const lank = mk(rad, 'button', 'kopplingstext', ByggeModell.arFlode(t, k) ? FRAS[ByggeModell.pariTyp(t, k.fran, k.till)](nm(k.fran), nm(k.till)) : `${nm(k.fran)} → ${nm(k.till)}`); lank.type = 'button';
       lank.addEventListener('click', () => ByggeVy.valj({ typ: 'kant', idx: i }));
       mk(rad, 'span', 'tecken ' + (tecken > 0 ? 'tecken-pa' : 'tecken-av'), tecken > 0 ? '+' : '−');
     }
-    if (['storhet', 'sensor', 'signal'].includes(sp.typ)) {
+    if (['storhet', 'sensor', 'signal'].includes(sp.typ) || (t.fritt && ['effektor', 'storning'].includes(sp.typ))) {
       const mal = Object.keys(S.B.noder).filter(x => x !== id && ByggeModell.kontrolleraKoppling(t, S.B, id, x).ok && !S.B.kopplingar.some(k => k.fran === id && k.till === x));
       const lab = mk(kopp, 'label', 'dim', 'Koppla till'); lab.setAttribute('for', 'koppla-till');
       const sel = mk(kopp, 'select'); sel.id = 'koppla-till'; sel.disabled = !mal.length;
       const o0 = mk(sel, 'option', '', mal.length ? 'Välj komponent…' : 'Inget att koppla till'); o0.value = '';
-      for (const x of mal) { const o = mk(sel, 'option', '', nm(x)); o.value = x; }
+      for (const x of mal) { const o = mk(sel, 'option', '', t.fritt ? `${nm(x)} (${ALT[ByggeModell.pariTyp(t, id, x)]})` : nm(x)); o.value = x; }
       sel.addEventListener('change', () => { if (sel.value) kopplaFran(id, sel.value); });
     }
 
     // Reglage
     for (const r of (info.reglage || [])) {
       if (r.val) continue;
-      const nu = (S.B.par[id] || {})[r.nyckel] !== undefined ? S.B.par[id][r.nyckel] : sp.par[r.nyckel];
+      const nu = r.egenskap ? sp[r.nyckel] : ((S.B.par[id] || {})[r.nyckel] !== undefined ? S.B.par[id][r.nyckel] : sp.par[r.nyckel]);
       const box = m('div', 'reglage');
       const lab = mk(box, 'label'); mk(lab, 'span', '', r.etikett); const out = mk(lab, 'output');
       const inp = mk(box, 'input'); inp.type = 'range'; inp.min = r.min; inp.max = r.max; inp.step = r.steg || 1; inp.setAttribute('aria-label', r.etikett);
       inp.value = tillVis(r, nu);
-      const upd = () => { out.textContent = (r.enhet === 'mmol/l' || r.enhet === '°C' ? fmt(+inp.value, 1) : Math.round(+inp.value)) + ' ' + r.enhet; };
+      const upd = () => { out.textContent = visaVarde(r, +inp.value); };
       upd();
-      inp.addEventListener('input', () => { upd(); (S.B.par[id] = S.B.par[id] || {})[r.nyckel] = franVis(r, +inp.value); efterByggandring(true); });
+      inp.addEventListener('input', () => {
+        upd();
+        if (r.egenskap) sp[r.nyckel] = franVis(r, +inp.value); else (S.B.par[id] = S.B.par[id] || {})[r.nyckel] = franVis(r, +inp.value);
+        efterByggandring(true);
+      });
     }
     if (!S.task.fasta.includes(id)) {
       const tb = mk(m('div', 'rad'), 'button', 'knapp liten', 'Ta bort komponenten'); tb.type = 'button';
@@ -2099,8 +2386,10 @@ const App = (() => {
   }
 
   // Reglagens visningsvärde: skala 1 = andel som procent, annat tal = procent av standardvärdet.
-  const tillVis = (r, v) => r.skala === 1 ? v * 100 : (r.skala ? v / r.skala * 100 : v);
-  const franVis = (r, x) => r.skala === 1 ? x / 100 : (r.skala ? x / 100 * r.skala : x);
+  const tillVis = (r, v) => r.faktor ? v / r.faktor : (r.skala === 1 ? v * 100 : (r.skala ? v / r.skala * 100 : v));
+  const franVis = (r, x) => r.faktor ? x * r.faktor : (r.skala === 1 ? x / 100 : (r.skala ? x / 100 * r.skala : x));
+  const visaVarde = (r, v) => (r.enhet === 'mmol/l' || r.enhet === '°C' ? fmt(v, 1) : (r.steg && r.steg < 1 ? fmt(v, 2) : String(Math.round(v)))) + (r.enhet ? ' ' + r.enhet : '');
+  const fin = (spann) => { for (const k of [1, 2, 5, 10, 20, 25, 50]) if (spann / k <= 6) return k; return 100; };
 
   /* ---------- rutor och paneler ---------- */
   function visaFlik(f) {
@@ -2187,11 +2476,20 @@ const App = (() => {
     const u = bygg() ? S.task : S.uppdrag, m = S.main, lag = bygg();
     const hand = S.hand.map(e => ({ t: e.t, etikett: etikett(e) }));
     $('ford-frisk').hidden = !S.frisk; $('ford-pred').hidden = S.pred.length < 2;
-    $('kurv-titel').textContent = lag ? `${ByggeModell.spec(S.task, S.huvud).namn} (${S.enhet})` : 'Blodglukos (mmol/l)';
+    const fr = lag && S.task.fritt, hs = fr && S.task.huvud ? ByggeModell.spec(S.task, S.huvud) : null, hv = hs ? hs.vis : null;
+    $('kurv-titel').textContent = fr ? (hs ? hs.namn + (S.enhet ? ` (${S.enhet})` : '') : 'Ingen storhet än') : (lag ? `${ByggeModell.spec(S.task, S.huvud).namn} (${S.enhet})` : 'Blodglukos (mmol/l)');
+    const val = $('kurv-val'); val.hidden = !fr || !hs;
+    if (fr) {
+      val.innerHTML = '';
+      for (const n of S.task.system.noder.filter(n => n.typ === 'storhet' && S.B.noder[n.id])) { const o = mk(val, 'option', '', n.namn); o.value = n.id; }
+      if (S.task.huvud) val.value = S.task.huvud;
+    }
     $('kurv-tips').textContent = (S.ritar && !S.harSpelat && !u.fri) ? 'Dra i kurvan för att rita din förutsägelse' : 'Dra i kurvan för att bläddra i tiden';
     dg.rita({
-      langd: m.langd, ymin: lag ? u.ymin : 0, ymax: u.ymax, ystep: lag ? (u.ymax - u.ymin <= 6 ? 1 : 2) : (u.ymax <= 8 ? 1 : (u.ymax <= 14 ? 2 : 5)), dt: m.dt, cursor: S.cursor,
-      band: lag ? u.band : [4, 6], bord: S.bord, handelser: hand, markorer: true,
+      langd: m.langd, ymin: fr ? (hv ? hv.min : 0) : (lag ? u.ymin : 0), ymax: fr ? (hv ? hv.max : 100) : u.ymax,
+      ystep: fr ? fin((hv ? hv.max - hv.min : 100)) : (lag ? (u.ymax - u.ymin <= 6 ? 1 : 2) : (u.ymax <= 8 ? 1 : (u.ymax <= 14 ? 2 : 5))), dt: m.dt, cursor: S.cursor,
+      band: fr ? (S.task.band && S.huvud === S.task.mallhuvud ? S.task.band : null) : (lag ? u.band : [4, 6]),
+      bord: fr ? (hs ? (S.huvud === S.task.mallhuvud && S.task.bord != null ? S.task.bord : hs.start) : null) : S.bord, handelser: hand, markorer: true,
       serier: [{ y: m.ser[S.huvud], klass: 's-glukos' }], frisk: S.frisk ? S.frisk.ser.G : null, pred: S.pred,
       lapp: (S.ritar && !S.harSpelat && !u.fri && S.pred.length < 2) ? 'Rita din förutsägelse här' : '',
     });
@@ -2251,8 +2549,9 @@ const App = (() => {
     Tema.init();
     const sel = $('valj-uppdrag');
     const grupp = (titel, lista) => { const g = document.createElement('optgroup'); g.label = titel; for (const u of lista) { const o = document.createElement('option'); o.value = u.id; o.textContent = u.rubrik; g.appendChild(o); } sel.appendChild(g); };
-    grupp('Uppdrag', UPPDRAG.filter(u => !u.fri)); grupp('Bygg', BYGGSATSER); grupp('Fritt', UPPDRAG.filter(u => u.fri));
+    grupp('Uppdrag', UPPDRAG.filter(u => !u.fri)); grupp('Bygg', BYGGSATSER); grupp('Fritt', [...UPPDRAG.filter(u => u.fri), { id: 'fritt', rubrik: 'Fritt bygge' }]);
     sel.addEventListener('change', () => valjUppdrag(sel.value));
+    $('kurv-val').addEventListener('change', ev => { S.task.huvud = ev.target.value; raknaBygg(); ritaAllt(); uppdatera(true); });
 
     Vy.bygg($('krets'));
     $('krets').addEventListener('click', ev => {
@@ -2296,7 +2595,7 @@ const App = (() => {
       if (bygg() && (ev.key === 'Delete' || ev.key === 'Backspace') && ByggeVy.vald) {
         ev.preventDefault();
         const v = ByggeVy.vald;
-        if (v.typ === 'kant') ByggeModell.taBortKoppling(S.B, v.idx);
+        if (v.typ === 'kant') ByggeModell.taBortKoppling(S.task, S.B, v.idx);
         else if (!ByggeModell.taBort(S.task, S.B, v.id)) { ByggeVy.medd('Den här komponenten är en fast del av kretsen och går inte att ta bort.'); return; }
         ByggeVy.valj(null); efterByggandring(); return;
       }
