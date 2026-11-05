@@ -10,6 +10,7 @@ Interaktiva webbappar för gymnasiet i kemi och biologi – kör direkt i webbl�
 | Kemi | Bindningsverkstan | [/bindningsverkstan/](https://kanintespela.github.io/kemisandladan/bindningsverkstan/) | 0.13 |
 | Kemi | Kemiska reaktioner och energi | [/reaktioner/](https://kanintespela.github.io/kemisandladan/reaktioner/) | prototyp 0.3 |
 | Biologi | Reglerverkstan | [/reglerverkstan/](https://kanintespela.github.io/kemisandladan/reglerverkstan/) | 0.3 |
+| Biologi | Kroppens termostat | [/kroppstemperatur/](https://kanintespela.github.io/kemisandladan/kroppstemperatur/) | 0.1 |
 
 Kemisandlådan låg tidigare direkt på [kanintespela.github.io/kemisandladan/](https://kanintespela.github.io/kemisandladan/). Där finns nu samlingssidan, där man väljer ämne; kemiapparna ligger samlade på [/kemi/](https://kanintespela.github.io/kemisandladan/kemi/) och biologiapparna på [/biologi/](https://kanintespela.github.io/kemisandladan/biologi/). Adresserna till apparna är oförändrade.
 
@@ -37,6 +38,10 @@ I byggläget bygger eleven kretsen själv av färdiga delar (blodsocker och krop
 
 I fritt bygge bygger eleven på en tom duk med egna storheter, källor, förluster, ventiler, sensorer och signaler, drar rören själv, lägger in störningar och läser en rapport om vad som hände. Det går också att börja från en färdig krets (blodsocker eller temperatur) och ta sönder eller bygga ut den.
 
+## Kroppens termostat
+
+En demo av homeostas för genomgången i helklass: en människa i en omgivning från −15 till 45 °C, med reglage för aktivitet, kläder och feber. Hypotalamus jämför temperaturen med börvärdet och styr hudens blodkärl, svettkörtlarna och skakningarna. Nervsignaler, hudfärg, svett och värmeflöden syns i bilden, och bredvid visas den negativa återkopplingsslingan, värmebalansen och temperaturkurvan. Effektorerna kan slås av för att visa vad som händer när återkopplingen bryts.
+
 ## Ljust och mörkt tema
 
 Alla appar och samlingssidorna har ett ljust och ett mörkt tema. Utan eget val följer de datorns inställning. Temaknappen uppe till höger byter, och valet sparas i webbläsaren och gäller då i alla apparna.
@@ -60,6 +65,7 @@ sandladan/index.html          Kemisandlådan
 bindningsverkstan/index.html  Bindningsverkstan
 reaktioner/index.html         Kemiska reaktioner och energi
 reglerverkstan/index.html     Reglerverkstan
+kroppstemperatur/index.html   Kroppens termostat
 ```
 
 ## Licens
