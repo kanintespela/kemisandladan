@@ -166,7 +166,8 @@
 
   .matare { display: flex; flex-direction: column; gap: 7px; }
   .matare-rad { display: grid; grid-template-columns: 112px 1fr; align-items: center; gap: 8px; font-size: 13px; }
-  .matare-rad .namn { color: var(--text-dim); }
+  .matare-rad .namn { color: var(--text-dim); line-height: 1.2; }
+  .matare-rad .namn small { display: block; font-size: 10.5px; opacity: .8; }
   .stapel { height: 12px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--border); position: relative; overflow: hidden; }
   .stapel .fyll { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 6px; }
   .stapel .mitt { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--text-dim); opacity: .6; }
@@ -256,11 +257,11 @@
       <label class="vaxel feber" style="margin-top:14px"><input type="checkbox" id="feber"><span class="spar"></span>Infektion med feber</label>
     </section>
     <section class="panel">
-      <h2>Effektorer som fungerar</h2>
+      <h2>Målorgan som fungerar</h2>
       <div class="falt" style="gap:9px">
         <label class="vaxel"><input type="checkbox" id="eff-blodkarl" checked><span class="spar"></span>Hudens blodkärl</label>
         <label class="vaxel"><input type="checkbox" id="eff-svett" checked><span class="spar"></span>Svettkörtlar</label>
-        <label class="vaxel"><input type="checkbox" id="eff-skak" checked><span class="spar"></span>Skakningar i musklerna</label>
+        <label class="vaxel"><input type="checkbox" id="eff-skak" checked><span class="spar"></span>Skelettmusklernas skakningar</label>
       </div>
     </section>
     <section class="panel">
@@ -291,14 +292,14 @@
       <svg id="slinga-svg" viewBox="0 0 294 212" role="img" aria-label="Återkopplingsslingan"></svg>
     </section>
     <section class="panel">
-      <h2>Effektorer</h2>
+      <h2>Målorgan</h2>
       <div class="matare">
         <div>
-          <div class="matare-rad"><span class="namn">Blodkärl i huden</span><div class="stapel" id="stapel-karl"><div class="mitt" style="left:35%"></div><div class="markor"></div></div></div>
+          <div class="matare-rad"><span class="namn">Blodkärl i huden<small>sympatiska nervceller</small></span><div class="stapel" id="stapel-karl"><div class="mitt" style="left:35%"></div><div class="markor"></div></div></div>
           <div class="matare-rad"><span></span><div class="stapel-skala"><span>sammandragna</span><span>vidgade</span></div></div>
         </div>
-        <div class="matare-rad"><span class="namn">Svettning</span><div class="stapel" id="stapel-svett"><div class="fyll" style="background:var(--svett)"></div></div></div>
-        <div class="matare-rad"><span class="namn">Skakningar</span><div class="stapel" id="stapel-skak"><div class="fyll" style="background:var(--kall)"></div></div></div>
+        <div class="matare-rad"><span class="namn">Svettkörtlar<small>sympatiska nervceller</small></span><div class="stapel" id="stapel-svett"><div class="fyll" style="background:var(--svett)"></div></div></div>
+        <div class="matare-rad"><span class="namn">Skelettmuskler<small>somatiska nervceller</small></span><div class="stapel" id="stapel-skak"><div class="fyll" style="background:var(--kall)"></div></div></div>
       </div>
     </section>
     <section class="panel">
@@ -334,7 +335,7 @@ const klamp = (x, a, b) => Math.max(a, Math.min(b, x));
    En kärna med en temperatur T (°C) och värmekapacitet C. Värme bildas av
    ämnesomsättning och skakningar och avges via huden (strålning, ledning,
    konvektion) och genom avdunstning av svett. Hypotalamus jämför en samlad
-   temperatursignal (kärnan och huden) med börvärdet och styr tre effektorer,
+   temperatursignal (kärnan och huden) med börvärdet och styr tre målorgan,
    som var och en följer sin styrsignal med en fördröjning.
    ========================================================================= */
 const PARAM = {
@@ -349,7 +350,7 @@ const PARAM = {
   vNeutral: 0.35,           // blodkärlens läge när ingen reglering behövs
   hudVikt: 0.02,            // hur mycket hudens temperatur väger in i hypotalamus signal
   hudNeutral: 32.5,
-  tau: { v: 90, s: 150, k: 60 },   // s, effektorernas fördröjning
+  tau: { v: 90, s: 150, k: 60 },   // s, målorganens fördröjning
   borvarde: 37.0, borvardeFeber: 39.0,
 };
 
@@ -423,9 +424,9 @@ const TEXT = {
   akt: { vila: 'vila', promenad: 'promenad', lopning: 'löpning' },
   klader: { tunna: 'tunna kläder', vanliga: 'vanliga kläder', varma: 'varma kläder' },
   slinga: {
-    varm: { forandring: ['Temperaturen', 'över börvärdet'], receptor: ['Värmereceptorer', 'i hud och hjärna'], centrum: ['Hypotalamus', 'jämför med börvärdet'], effektor: ['Blodkärlen vidgas,', 'svettkörtlarna arbetar'], svar: ['Mer värme avges:', 'temperaturen sjunker'] },
-    kall: { forandring: ['Temperaturen', 'under börvärdet'], receptor: ['Köldreceptorer', 'i hud och hjärna'], centrum: ['Hypotalamus', 'jämför med börvärdet'], effektor: ['Blodkärlen dras ihop,', 'musklerna skakar'], svar: ['Mindre avges, mer bildas:', 'temperaturen stiger'] },
-    lugn: { forandring: ['Temperaturen', 'nära börvärdet'], receptor: ['Temperatur-', 'receptorer'], centrum: ['Hypotalamus', 'jämför med börvärdet'], effektor: ['Små ändringar', 'av blodflödet i huden'], svar: ['Temperaturen', 'hålls stabil'] },
+    varm: { forandring: ['Temperaturen', 'över börvärdet'], receptor: ['Värmereceptorer', 'i hud och hjärna'], centrum: ['Hypotalamus', 'jämför med börvärdet'], malorgan: ['Blodkärlen vidgas,', 'svettkörtlarna arbetar'], svar: ['Mer värme avges:', 'temperaturen sjunker'] },
+    kall: { forandring: ['Temperaturen', 'under börvärdet'], receptor: ['Köldreceptorer', 'i hud och hjärna'], centrum: ['Hypotalamus', 'jämför med börvärdet'], malorgan: ['Blodkärlen dras ihop,', 'musklerna skakar'], svar: ['Mindre avges, mer bildas:', 'temperaturen stiger'] },
+    lugn: { forandring: ['Temperaturen', 'nära börvärdet'], receptor: ['Temperatur-', 'receptorer'], centrum: ['Hypotalamus', 'jämför med börvärdet'], malorgan: ['Små ändringar', 'av blodflödet i huden'], svar: ['Temperaturen', 'hålls stabil'] },
   },
 };
 
@@ -624,7 +625,9 @@ if (typeof document !== 'undefined') {
     karl: etikett('Blodkärl\ni huden', 470, 300, 398, 300),
     svett: etikett('Svettkörtlar', 470, 222, 340, 214),
     skak: etikett('Skelettmuskler', 470, 452, 352, 446),
-    karna: etikett('Kärnan', 30, 262, 244, 262),
+    karna: etikett('Kärntemperatur\n(inre organ)', 30, 262, 244, 262),
+    sens: etikett('Sensoriska\nnervceller', 30, 170, 228, 236),
+    mot: etikett('Motoriska\nnervceller', 470, 150, 348, 186),
   };
 
   // ---------- partiklar ----------
@@ -732,6 +735,8 @@ if (typeof document !== 'undefined') {
 
     et.hypo.classList.toggle('aktiv', Math.abs(e) > 0.12);
     et.rec.classList.toggle('aktiv', Math.abs(e) > 0.12);
+    et.sens.classList.toggle('aktiv', Math.abs(e) > 0.12);
+    et.mot.classList.toggle('aktiv', Math.abs(vAvv) > 0.15 || z.s > 0.05 || z.k > 0.05);
     et.karl.classList.toggle('aktiv', Math.abs(vAvv) > 0.15);
     et.svett.classList.toggle('aktiv', z.s > 0.05);
     et.skak.classList.toggle('aktiv', z.k > 0.05);
@@ -745,8 +750,8 @@ if (typeof document !== 'undefined') {
   const pilspets = el('marker', { id: 'pil', viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, slDefs);
   const pilspetsP = el('path', { d: 'M0 0 L10 5 L0 10 Z' }, pilspets);
   const noder = {};
-  const nodPos = { forandring: [147, 22], receptor: [236, 104], centrum: [147, 190], effektor: [58, 104] };
-  // förändring → receptorer → styrcentrum → effektorer → (svaret motverkar förändringen)
+  const nodPos = { forandring: [147, 22], receptor: [236, 104], centrum: [147, 190], malorgan: [58, 104] };
+  // förändring → receptorer → styrcentrum → målorgan → (svaret motverkar förändringen)
   const pilar = [
     el('path', { d: 'M214 30 Q238 40 240 80', class: 'slinga-pil', 'marker-end': 'url(#pil)' }, SL),
     el('path', { d: 'M240 128 Q238 174 216 186', class: 'slinga-pil', 'marker-end': 'url(#pil)' }, SL),
@@ -814,7 +819,7 @@ if (typeof document !== 'undefined') {
     st.className = 'status ' + klass;
     ritaSlinga(lage);
 
-    // effektorer
+    // målorgan
     const karl = $('stapel-karl');
     karl.classList.toggle('ur-funktion', !inst.blodkarl);
     const m = karl.querySelector('.markor');

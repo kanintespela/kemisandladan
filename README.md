@@ -40,7 +40,7 @@ I fritt bygge bygger eleven på en tom duk med egna storheter, källor, förlust
 
 ## Kroppens termostat
 
-En demo av homeostas för genomgången i helklass: en människa i en omgivning från −15 till 45 °C, med reglage för aktivitet, kläder och feber. Hypotalamus jämför temperaturen med börvärdet och styr hudens blodkärl, svettkörtlarna och skakningarna. Nervsignaler, hudfärg, svett och värmeflöden syns i bilden, och bredvid visas den negativa återkopplingsslingan, värmebalansen och temperaturkurvan. Effektorerna kan slås av för att visa vad som händer när återkopplingen bryts.
+En demo av homeostas för genomgången i helklass: en människa i en omgivning från −15 till 45 °C, med reglage för aktivitet, kläder och feber. Hypotalamus jämför temperaturen med börvärdet och styr via sensoriska och motoriska nervceller målorganen: hudens blodkärl, svettkörtlarna och skelettmusklerna. Nervsignaler, hudfärg, svett och värmeflöden syns i bilden, och bredvid visas den negativa återkopplingsslingan, värmebalansen och temperaturkurvan. Målorganen kan slås av för att visa vad som händer när återkopplingen bryts.
 
 ## Ljust och mörkt tema
 
