@@ -9,8 +9,6 @@ Interaktiva webbappar för gymnasiet i kemi och biologi – kör direkt i webbl�
 | Kemi | Kemisandlådan | [/sandladan/](https://kanintespela.github.io/kemisandladan/sandladan/) | beta 0.5 |
 | Kemi | Bindningsverkstan | [/bindningsverkstan/](https://kanintespela.github.io/kemisandladan/bindningsverkstan/) | 0.13 |
 | Kemi | Kemiska reaktioner och energi | [/reaktioner/](https://kanintespela.github.io/kemisandladan/reaktioner/) | prototyp 0.3 |
-| Biologi | Reglerverkstan | [/reglerverkstan/](https://kanintespela.github.io/kemisandladan/reglerverkstan/) | 0.3 |
-| Biologi | Kroppens termostat | [/kroppstemperatur/](https://kanintespela.github.io/kemisandladan/kroppstemperatur/) | 0.1 |
 
 Kemisandlådan låg tidigare direkt på [kanintespela.github.io/kemisandladan/](https://kanintespela.github.io/kemisandladan/). Där finns nu samlingssidan, där man väljer ämne; kemiapparna ligger samlade på [/kemi/](https://kanintespela.github.io/kemisandladan/kemi/) och biologiapparna på [/biologi/](https://kanintespela.github.io/kemisandladan/biologi/). Adresserna till apparna är oförändrade.
 

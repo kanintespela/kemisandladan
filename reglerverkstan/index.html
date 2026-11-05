@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reglerverkstan 0.3</title>
+<title>Reglerverkstan 0.4</title>
 <script id="tema-start">
   // Tema före första ritningen, så att sidan inte blinkar till i fel tema.
   // Ett sparat val (temaknappen) gäller i alla apparna på webbplatsen;
@@ -272,6 +272,9 @@
   .namnfalt { width: 100%; background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 16px; font-weight: 600; margin-bottom: 4px; }
   .handelser { list-style: none; margin-top: 6px; font-size: 13px; }
   .handelser li { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .egenrad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .egenfalt { display: flex; flex-direction: column; font-size: 12px; color: var(--text-dim); }
+  .egenfalt input { width: 100%; min-width: 0; background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 5px; padding: 4px 5px; font: inherit; font-size: 14px; }
   .rapport { margin-bottom: 6px; font-size: 14px; padding-left: 8px; border-left: 3px solid var(--border); }
   .rapport.ok { border-left-color: var(--accent2); } .rapport.fel { border-left-color: var(--warm); }
   #kurv-val { font-size: 13px; padding: 2px 6px; }
@@ -356,7 +359,7 @@
       <select id="kurv-val" hidden aria-label="Storhet i diagrammet"></select>
       <span class="forklaring"><i style="border-color:var(--glukos)"></i> modell</span>
       <span class="forklaring" id="ford-frisk" hidden><i class="streck" style="border-color:var(--text-dim)"></i> frisk, samma händelser</span>
-      <span class="forklaring" id="ford-pred" hidden><i class="streck" style="border-color:var(--accent2)"></i> din förutsägelse</span>
+      <span class="forklaring" id="ford-pred" hidden><i class="streck" style="border-color:var(--accent2)"></i> <span id="ford-pred-text">din förutsägelse</span></span>
       <span class="dim" id="kurv-tips" style="margin-left:auto"></span>
     </div>
     <div id="kurv-g"></div>
@@ -374,6 +377,7 @@
     <li>Klicka på en komponent i kretsen för att läsa om den. I Sandlådan går den att ändra med reglage.</li>
     <li>Dra i kurvorna för att bläddra i tiden. Mellanslag startar och pausar, pilarna stegar.</li>
     <li>I uppdragen ritar du först en förutsägelse i blodglukoskurvan.</li>
+    <li>I <b>Bygg: pulsen</b> och i Fritt bygge med mallen Puls kan du skriva in dina egna pulsvärden från undersökningen och jämföra med modellens kurva. Värdena sparas inte.</li>
     <li>I <b>Fritt bygge</b> börjar du på en tom duk (eller från en färdig krets) och lägger till egna storheter, källor, förluster, ventiler, sensorer och signaler. Dra rören själv: en ventil tar från en storhet och ger till en annan. Lägg in störningar vid vald tid och läs rapporten.</li>
     <li>I Bygg lägger du till komponenter och kopplar dem: dra från ● till en annan komponent. Klicka på ett + eller − för att vända tecknet. Kretsen bedöms på hur den beter sig i varje situation, så flera olika kopplingar kan vara rätt. Delete tar bort det som är markerat.</li>
   </ul>
@@ -471,7 +475,9 @@ const Motor = (() => {
         const sub = ef.fran ? X[ef.fran] / (X[ef.fran] + p.km) : 1;
         const b = belast[ef.id], mul = b && t < b.till ? b.faktor : 1;
         oppen[ef.id] = rec * (bas + (1 - bas) * h) * mul;
-        rate[ef.id] = p.kap * oppen[ef.id] * sub;
+        // Ett flöde kan drivas av en annan storhet (t.ex. syretillförsel ∝ puls): värdet delas med ett referensvärde.
+        const drv = ef.drivs ? X[ef.drivs] / (p.drivref || 1) : 1;
+        rate[ef.id] = p.kap * oppen[ef.id] * sub * drv;
         if (ef.fran) dX[ef.fran] -= rate[ef.id];
         if (ef.till) dX[ef.till] += rate[ef.id];
       }
@@ -526,6 +532,7 @@ const Motor = (() => {
       else if (n.typ === 'signal') k(n.fran, n.id, 1, 'signal');
       else if (n.typ === 'effektor') {
         if (n.signal) k(n.signal, n.id, P[n.id].dir < 0 ? -1 : 1, 'signal');
+        if (n.drivs) k(n.drivs, n.id, 1, 'driv');
         if (n.till) k(n.id, n.till, 1, 'flode');
         if (n.fran) k(n.id, n.fran, -1, 'flode');
       } else if (n.typ === 'storning') k(n.id, n.till, 1, 'flode');
@@ -563,19 +570,20 @@ const Motor = (() => {
         storhet: ids.find(id => nod(id).typ === 'storhet'),
         effektor: ids.find(id => nod(id).typ === 'effektor'),
         paverkan: sista.tecken,
+        // Vad slingans effektor gör med varje storhet som ligger i slingan (+ ökar, − minskar).
+        verkan: kanter_.reduce((o, k) => { if (k.art === 'flode' && nod(k.till) && nod(k.till).typ === 'storhet') o[k.till] = k.tecken; return o; }, {}),
       };
     });
   }
 
-  // Slingor som verkar åt motsatt håll på samma storhet.
+  // Slingor som verkar åt motsatt håll på samma storhet: två negativa slingor vars effektorer ökar respektive minskar den.
   function tavlande(lista) {
     const per = {};
-    // Bara negativa slingor reglerar; en skenande slinga är ingen tävlande väg.
-    lista.forEach((s, i) => { if (s.typ === 'negativ') (per[s.storhet] = per[s.storhet] || []).push(i); });
+    lista.forEach((sl, i) => { if (sl.typ === 'negativ') for (const x in sl.verkan) (per[x] = per[x] || []).push(i); });
     const ut = [];
     for (const st in per) {
       const g = per[st];
-      const upp = g.filter(i => lista[i].paverkan > 0), ner = g.filter(i => lista[i].paverkan < 0);
+      const upp = g.filter(i => lista[i].verkan[st] > 0), ner = g.filter(i => lista[i].verkan[st] < 0);
       if (upp.length && ner.length) ut.push({ storhet: st, hoja: upp, sanka: ner });
     }
     return ut;
@@ -651,6 +659,27 @@ Object.assign(KOMPONENT, {
     reglage: [{ nyckel: 'kap', etikett: 'Kapacitet', min: 0, max: 150, enhet: '%', skala: 0.30 }] },
   rys: { slag: 'Effektor', text: 'Musklerna skakar och bildar värme.',
     reglage: [{ nyckel: 'kap', etikett: 'Kapacitet', min: 0, max: 150, enhet: '%', skala: 0.15 }] },
+});
+
+Object.assign(KOMPONENT, {
+  vilobehov: { slag: 'Källa', text: 'Musklernas arbete. När kroppen rör sig ökar behovet av syre.' },
+  B: { slag: 'Storhet', text: 'Hur mycket syre musklerna behöver. Behovet ökar vid rörelse och minskar när syret hunnit fram.' },
+  syretillf: { slag: 'Förlust', text: 'Syret når musklerna och behovet minskar, långsammare ju mindre som återstår.' },
+  egentakt: { slag: 'Källa', text: 'Hjärtats egen pacemaker slår, utan nervpåverkan, snabbare än vilopulsen: ungefär 100 slag per minut.' },
+  avtar: { slag: 'Förlust', text: 'Gör att pulsen inte kan öka utan gräns. Tillsammans med hjärtats egen takt ger den en jämvikt vid ungefär 100 slag per minut.' },
+  P: { slag: 'Storhet', text: 'Antal hjärtslag per minut. Det gröna bandet är ett vanligt område för vilopuls (ungefär 60–100 slag per minut).' },
+  arbreg: { slag: 'Sensor', text: 'Registrerar att musklerna arbetar, till exempel genom förändringar i muskler och blod. Aktiveras när behovet av syre är högt.',
+    reglage: [{ nyckel: 'funk', etikett: 'Fungerande celler', min: 0, max: 100, enhet: '%', skala: 1 }, { nyckel: 'trosk', etikett: 'Tröskel', min: 10, max: 80, steg: 1, enhet: '', skala: null }] },
+  vilreg: { slag: 'Sensor', text: 'Registrerar att kroppen vilar. Aktiveras när behovet av syre är lågt.',
+    reglage: [{ nyckel: 'funk', etikett: 'Fungerande celler', min: 0, max: 100, enhet: '%', skala: 1 }, { nyckel: 'trosk', etikett: 'Tröskel', min: 10, max: 80, steg: 1, enhet: '', skala: null }] },
+  symp: { slag: 'Signalämne', text: 'Sympatikus: nervsignaler som ökar hjärtats takt.',
+    reglage: [{ nyckel: 'fordr', etikett: 'Fördröjning', min: 1, max: 30, enhet: 's', skala: null }] },
+  para: { slag: 'Signalämne', text: 'Parasympatikus: nervsignaler som bromsar hjärtat.',
+    reglage: [{ nyckel: 'fordr', etikett: 'Fördröjning', min: 1, max: 30, enhet: 's', skala: null }] },
+  sympeff: { slag: 'Effektor', text: 'Hjärtats pacemakerceller slår snabbare under påverkan av sympatikus.',
+    reglage: [{ nyckel: 'kap', etikett: 'Kapacitet', min: 0, max: 150, enhet: '%', skala: 2 }] },
+  paraeff: { slag: 'Effektor', text: 'Hjärtats pacemakerceller bromsas under påverkan av parasympatikus (vagusnerven).',
+    reglage: [{ nyckel: 'kap', etikett: 'Kapacitet', min: 0, max: 150, enhet: '%', skala: 2.65 }] },
 });
 
 const LAGEN = [
@@ -755,6 +784,26 @@ const KROPPSTEMP = {
   ],
 };
 
+// Ett tredje system: pulsen vid rörelse och återhämtning. Tiden är i sekunder. Värdena är kvalitativa:
+// hjärtats egen takt är högre än vilopulsen, och nervsystemet bromsar (parasympatikus) eller påskyndar (sympatikus).
+const KROPPSPULS = {
+  id: 'puls', namn: 'Pulsreglering', dt: 1,
+  noder: [
+    { id: 'vilobehov', typ: 'effektor', namn: 'Musklernas arbete', fran: null, till: 'B', signal: null, par: { kap: 0.3125, km: 1 } },
+    { id: 'B', typ: 'storhet', namn: 'Musklernas behov av syre', start: 20, vis: { min: 0, max: 100, enhet: '', dec: 0, b: 200, h: 100, farg: '--warm' } },
+    { id: 'syretillf', typ: 'effektor', namn: 'Syretillförsel', fran: 'B', till: null, signal: null, drivs: 'P', par: { kap: 2, km: 108, drivref: 70 } },
+    { id: 'egentakt', typ: 'effektor', namn: 'Hjärtats egen takt', fran: null, till: 'P', signal: null, par: { kap: 5, km: 1 } },
+    { id: 'avtar', typ: 'effektor', namn: 'Pulsen avtar', fran: 'P', till: null, signal: null, par: { kap: 10, km: 100 } },
+    { id: 'P', typ: 'storhet', namn: 'Puls', start: 70, vis: { min: 40, max: 180, enhet: 'slag/min', dec: 0, b: 240, h: 130, farg: '--positiv' } },
+    { id: 'arbreg', typ: 'sensor', namn: 'Arbetsregistrering', farg: '--positiv', form: 'romb', par: { funk: 1, trosk: 35, bredd: 8, dir: 1 } },
+    { id: 'vilreg', typ: 'sensor', namn: 'Viloregistrering', farg: '--accent', form: 'triangel', par: { funk: 1, trosk: 35, bredd: 8, dir: -1 } },
+    { id: 'symp', typ: 'signal', namn: 'Sympatikus', form: 'romb', par: { fordr: 14, tau: 60 } },
+    { id: 'para', typ: 'signal', namn: 'Parasympatikus', form: 'triangel', par: { fordr: 14, tau: 60 } },
+    { id: 'sympeff', typ: 'effektor', namn: 'Hjärtat: snabbare', fran: null, till: 'P', reglerad: true, par: { kap: 2, bas: 0, km: 1, dir: 1 } },
+    { id: 'paraeff', typ: 'effektor', namn: 'Hjärtat: långsammare', fran: 'P', till: null, reglerad: true, par: { kap: 2.65, bas: 0, km: 70, dir: 1 } },
+  ],
+};
+
 // Delar av blodsockersystemet får utseende och plats i byggläget.
 Object.assign(BLODSOCKER.noder.find(n => n.id === 'G'), { vis: { min: 0, max: 16, enhet: 'mmol/l', dec: 1, b: 240, h: 130, farg: '--blod' } });
 Object.assign(BLODSOCKER.noder.find(n => n.id === 'F'), { vis: { min: 0, max: 100, enhet: '', dec: 0, b: 240, h: 90, farg: '--glukos', fyllning: true } });
@@ -807,6 +856,29 @@ const BYGGSATSER = [
       'Värmereceptorerna aktiveras av värme och köldreceptorerna av kyla. Signal A och B kan kopplas till vad som helst.',
       'Svettkörtlarna kyler och musklernas skakningar värmer. Koppla så att värmen leder till svett och kylan leder till skakningar.',
       'Räkna minustecknen under fliken Slingor. Jämnt antal minustecken ger positiv återkoppling.',
+    ] },
+  { id: 'bygg-puls', rubrik: '8. Bygg: pulsen efter rörelse', system: KROPPSPULS, huvud: 'P', enhet: 'slag/min', dec: 0, flodfarg: '--positiv',
+    band: [60, 100], ymin: 40, ymax: 160, bord: 70, tidenhet: 's', signaltitel: 'Nervsignaler, relativ nivå', egen: true,
+    uppgift: 'Bygg en krets som håller pulsen i vila, låter den stiga vid rörelse och sänker den igen efteråt. Lägg till komponenter, koppla ihop dem och klara alla tre situationerna.',
+    fasta: ['vilobehov', 'B', 'syretillf', 'egentakt', 'avtar', 'P'],
+    palett: ['arbreg', 'vilreg', 'symp', 'para', 'sympeff', 'paraeff'],
+    plats: { vilobehov: [190, 90], B: [190, 250], syretillf: [190, 420], egentakt: [860, 215], avtar: [860, 295], P: [620, 250], arbreg: [330, 120], vilreg: [330, 400], symp: [450, 45], para: [450, 475], sympeff: [580, 115], paraeff: [580, 395] },
+    scenarier: [
+      { id: 'vila', namn: 'Vila i fem minuter', hand: [], langd: 300, krav: [{ mat: 'inom', lo: 60, hi: 100, text: 'Pulsen stannar mellan 60 och 100 slag/min' }] },
+      { id: 'latt', namn: 'Gå på stället i en minut', hand: [{ t: 30, typ: 'belastning', mal: 'vilobehov', faktor: 3, langd: 60, etikett: 'Rörelse' }], langd: 300, krav: [
+        { mat: 'toppmin', min: 100, text: 'Pulsen stiger till minst 100 slag/min' },
+        { mat: 'max', max: 135, text: 'Toppen blir högst 135 slag/min' },
+        { mat: 'slut', tol: 6, text: 'Pulsen är tillbaka nära vilovärdet efter tre minuter' }] },
+      { id: 'hard', namn: 'Springa på stället i en minut', hand: [{ t: 30, typ: 'belastning', mal: 'vilobehov', faktor: 5, langd: 60, etikett: 'Hård rörelse' }], langd: 300, krav: [
+        { mat: 'toppmin', min: 125, text: 'Pulsen stiger till minst 125 slag/min' },
+        { mat: 'max', max: 165, text: 'Toppen blir högst 165 slag/min' },
+        { mat: 'slut', tol: 8, text: 'Pulsen är tillbaka nära vilovärdet efter tre minuter' }] },
+    ],
+    tips: [
+      'Pulsen ska både kunna öka och minska. Vilka komponenter behövs för att styra varje riktning?',
+      'Utan nervpåverkan slår hjärtat snabbare än vilopulsen. Något måste bromsa i vila, och något annat påskynda vid rörelse.',
+      'Musklernas behov av syre ökar vid rörelse. Det ska väcka den väg som påskyndar och tystna när den som bromsar tar över igen.',
+      'Räkna minustecknen under fliken Slingor. Hjärtat får en bromsande och en påskyndande väg: tävlande vägar.',
     ] },
 ];
 
@@ -1000,6 +1072,8 @@ const ByggeModell = (() => {
     for (const id in m.par) B.par[id] = Object.assign({}, m.par[id]);
     task.huvud = m.huvud; task.mallhuvud = m.huvud; task.ymin = m.ymin; task.ymax = m.ymax; task.bord = m.bord; task.band = m.band; task.enhet = m.enhet; task.dec = m.dec;
     task.scenarier[0].langd = m.langd;
+    task.system.dt = m.system.dt;
+    task.tidenhet = m.tidenhet || 'min'; task.belLangd = m.belLangd || 30; task.signaltitel = m.signaltitel; task.egen = !!m.egen; if (m.flodfarg) task.flodfarg = m.flodfarg;
     synkaFlode(task, B);
     return { task, B };
   }
@@ -1014,7 +1088,7 @@ const ByggeModell = (() => {
       if (c.typ === 'sensor') { delete c.mot; }
       if (c.typ === 'signal') { delete c.fran; }
       if (c.typ === 'effektor' && c.signal !== undefined && n.signal !== null) delete c.signal;
-      if (c.typ === 'effektor') { if (c.fran && !B.noder[c.fran]) c.fran = null; if (c.till && !B.noder[c.till]) c.till = null; }
+      if (c.typ === 'effektor') { if (c.fran && !B.noder[c.fran]) c.fran = null; if (c.till && !B.noder[c.till]) c.till = null; if (c.drivs && !B.noder[c.drivs]) delete c.drivs; }
       if (c.typ === 'storning' && c.till && !B.noder[c.till]) c.till = null;
       noder.push(c);
     }
@@ -1036,6 +1110,7 @@ const ByggeModell = (() => {
     for (const v of y) { if (v > mx) mx = v; if (v < mn) mn = v; }
     if (k.mat === 'max') return { ok: mx <= k.max + 1e-9, varde: `högst ${f(mx)} ${enhet}` };
     if (k.mat === 'min') return { ok: mn >= k.min - 1e-9, varde: `lägst ${f(mn)} ${enhet}` };
+    if (k.mat === 'toppmin') return { ok: mx >= k.min - 1e-9, varde: `högst ${f(mx)} ${enhet}` };
     if (k.mat === 'inom') return { ok: mn >= k.lo - 1e-9 && mx <= k.hi + 1e-9, varde: `${f(mn)}–${f(mx)} ${enhet}` };
     if (k.mat === 'slut') {
       const n = Math.round(30 / dt); let sum = 0;
@@ -1098,6 +1173,9 @@ const ByggeModell = (() => {
 const MALLAR = {
   blodsocker: { namn: 'blodsocker', system: BLODSOCKER, plats: BYGGSATSER[0].plats, huvud: 'G', ymin: 0, ymax: 16, bord: 5, band: [4, 6], enhet: 'mmol/l', dec: 1, langd: 360, par: {},
     kopp: [['G', 'beta'], ['beta', 'insulin'], ['insulin', 'upptag'], ['G', 'alfa'], ['alfa', 'glukagon'], ['glukagon', 'friset']] },
+  puls: { namn: 'puls', system: KROPPSPULS, plats: BYGGSATSER[2].plats, huvud: 'P', ymin: 40, ymax: 160, bord: 70, band: [60, 100], enhet: 'slag/min', dec: 0, langd: 300, par: {},
+    tidenhet: 's', belLangd: 60, signaltitel: 'Nervsignaler, relativ nivå', egen: true, flodfarg: '--positiv',
+    kopp: [['B', 'arbreg'], ['arbreg', 'symp'], ['symp', 'sympeff'], ['B', 'vilreg'], ['vilreg', 'para'], ['para', 'paraeff']] },
   temp: { namn: 'kroppstemperatur', system: KROPPSTEMP, plats: BYGGSATSER[1].plats, huvud: 'T', ymin: 35, ymax: 39, bord: 37, band: [36.5, 37.5], enhet: '°C', dec: 1, langd: 300, par: {},
     kopp: [['T', 'varmres'], ['varmres', 'sigA'], ['sigA', 'svett'], ['T', 'kallres'], ['kallres', 'sigB'], ['sigB', 'rys']] },
 };
@@ -1441,7 +1519,7 @@ const Diagram = (() => {
       const steg = c.langd <= 300 ? 30 : 60;
       for (let t = 0; t <= c.langd + 1e-9; t += steg) {
         E('line', { x1: X(t), x2: X(t), y1: by + bh, y2: by + bh + 4, class: 'axel' }, svg);
-        const tx = E('text', { x: X(t), y: H - 4, 'text-anchor': 'middle' }, svg); tx.textContent = t === 0 ? '0 min' : String(t);
+        const tx = E('text', { x: X(t), y: H - 4, 'text-anchor': 'middle' }, svg); tx.textContent = t === 0 ? '0 ' + (c.tidenhet || 'min') : String(t);
       }
       E('line', { x1: bx, x2: bx + bw, y1: by + bh, y2: by + bh, class: 'axel' }, svg);
       if (c.bord != null) E('line', { x1: bx, x2: bx + bw, y1: Y(c.bord), y2: Y(c.bord), class: 'hand' }, svg);
@@ -1674,10 +1752,20 @@ const ByggeVy = (() => {
       if (typ !== 'storhet') banor['sig:' + i] = { pts: [pa, pb], art: 'signal', kalla: k.fran };
     });
 
+    // en given koppling: ett flöde drivs av en annan storhet (t.ex. syretillförseln av pulsen)
+    for (const id in B.noder) {
+      const sp = SPEC(id); if (!sp.drivs || !B.noder[sp.drivs]) continue;
+      const pa = rand(sp.drivs, mitt(id)), pb = rand(id, mitt(sp.drivs)), mp = mjuk(pa, pb);
+      E('path', { d: d([pa, pb]), class: 'bkant driv', 'marker-end': 'url(#pil)' }, kg);
+      const bd = E('g', { class: 'bbadge plus', transform: `translate(${mp[0].toFixed(1)},${mp[1].toFixed(1)})` }, bg);
+      E('circle', { r: 12 }, bd); T('+', {}, bd);
+    }
+
     // lysande kanter för slingor (läggs över kopplingar)
     R.kantOv = {};
     B.kopplingar.forEach((k, i) => { if (ByggeModell.arFlode(task, k)) return; R.kantOv[k.fran + '>' + k.till] = E('path', { d: d([rand(k.fran, mitt(k.till)), rand(k.till, mitt(k.fran))]), class: 'blys' }, ov); });
     for (const k in R.flodOv) R.kantOv[k] = E('path', { d: d(R.flodOv[k]), class: 'blys' }, ov);
+    for (const id in B.noder) { const sp = SPEC(id); if (sp.drivs && B.noder[sp.drivs]) R.kantOv[sp.drivs + '>' + id] = E('path', { d: d([rand(sp.drivs, mitt(id)), rand(id, mitt(sp.drivs))]), class: 'blys' }, ov); }
 
     // komponenter
     const ng = E('g', {}, svg);
@@ -1910,6 +1998,7 @@ const App = (() => {
     cursor: 0, spelar: false, fart: 6, harSpelat: false, slut: false,
     pred: [], ritar: false, vald: 'beta', flik: 'komp', visaSling: false, svarat: false,
     task: null, B: null, utv: null, scen: null, tips: 0, parN: -1, fhand: [], hTid: 30,
+    tid: 'min', egen: { vila: '', p: ['', '', '', ''] },
   };
   const $ = id => document.getElementById(id);
   let dg, dh, sistaIdx = -1, senast = 0;
@@ -1943,7 +2032,7 @@ const App = (() => {
     const sc = S.utv.scen.find(x => x.id === S.scen) || S.utv.scen[0];
     S.scen = sc.id; S.main = sc.run; S.frisk = null; S.bord = t.bord;
     S.hand = t.scenarier.find(x => x.id === sc.id).hand;
-    S.huvud = t.huvud; S.enhet = t.enhet; S.dec = t.dec;
+    S.huvud = t.huvud; S.enhet = t.enhet; S.dec = t.dec; S.tid = t.tidenhet || 'min';
     if (!S.huvud) { S.main.ser._tom = new Float32Array(S.main.n + 1); S.huvud = '_tom'; }
     else if (t.fritt) { const v = ByggeModell.spec(t, S.huvud).vis || {}; S.enhet = v.enhet || ''; S.dec = v.dec || 0; }
     S.horm = S.def.noder.filter(n => n.typ === 'signal').map(n => n.id);
@@ -1963,7 +2052,7 @@ const App = (() => {
     const t = BYGGSATSER.find(x => x.id === id);
     if (t) return valjBygge(t);
     const u = UPPDRAG.find(x => x.id === id) || UPPDRAG[0];
-    S.mode = 'utforska'; S.def = BLODSOCKER; S.task = null; S.huvud = 'G'; S.horm = ['insulin', 'glukagon']; S.enhet = 'mmol/l'; S.dec = 1;
+    S.mode = 'utforska'; S.def = BLODSOCKER; S.task = null; S.huvud = 'G'; S.horm = ['insulin', 'glukagon']; S.enhet = 'mmol/l'; S.dec = 1; S.tid = 'min';
     S.uppdrag = u; S.start = Object.assign({}, u.start); S.hand = u.hand.map(e => Object.assign({}, e));
     S.cursor = 0; S.spelar = false; S.harSpelat = false; S.slut = false; S.pred = []; S.ritar = !u.fri;
     S.svarat = false; S.visaSling = false; S.vald = 'beta';
@@ -1973,7 +2062,7 @@ const App = (() => {
   }
 
   function valjBygge(t) {
-    S.mode = 'bygg'; S.task = t; S.B = ByggeModell.nytt(t); S.scen = t.scenarier[0].id; S.tips = 0;
+    S.mode = 'bygg'; S.task = t; S.B = ByggeModell.nytt(t); S.scen = t.scenarier[0].id; S.tips = 0; S.egen = { vila: '', p: ['', '', '', ''] };
     S.spelar = false; S.harSpelat = true; S.slut = false; S.pred = []; S.ritar = false; S.svarat = false; S.visaSling = false; S.flik = 'komp';
     $('valj-uppdrag').value = t.id;
     ByggeVy.rensaPartiklar(); Vy.rensaPartiklar();
@@ -1986,7 +2075,7 @@ const App = (() => {
   // Fritt bygge: en tom duk, eller en färdig krets att ändra på.
   function valjFritt(mall) {
     const { task, B } = mall === 'tom' ? ByggeModell.nyttFritt() : ByggeModell.franMall(mall);
-    S.mode = 'bygg'; S.task = task; S.B = B; S.fhand = task.scenarier[0].hand; S.scen = 'prov'; S.tips = 0;
+    S.mode = 'bygg'; S.task = task; S.B = B; S.fhand = task.scenarier[0].hand; S.scen = 'prov'; S.tips = 0; S.egen = { vila: '', p: ['', '', '', ''] };
     S.spelar = false; S.harSpelat = true; S.slut = false; S.pred = []; S.ritar = false; S.svarat = false; S.visaSling = false; S.flik = 'komp'; S.hTid = 30;
     $('valj-uppdrag').value = 'fritt';
     ByggeVy.rensaPartiklar(); Vy.rensaPartiklar();
@@ -2015,7 +2104,7 @@ const App = (() => {
       mk(k, 'p', 'dim', 'Dra från ● till en annan komponent för att koppla. Klicka på + eller − för att vända tecknet.');
       mk(k, 'div', 'dim', 'Börja från').style.marginTop = '8px';
       const r = mk(k, 'div', 'rad'); r.style.marginTop = '4px';
-      for (const [id, txt] of [['tom', 'Tom duk'], ['blodsocker', 'Blodsocker'], ['temp', 'Temperatur']]) {
+      for (const [id, txt] of [['tom', 'Tom duk'], ['blodsocker', 'Blodsocker'], ['temp', 'Temperatur'], ['puls', 'Puls']]) {
         const b = mk(r, 'button', 'knapp liten', txt); b.type = 'button'; b.dataset.mall = id; b.addEventListener('click', () => valjFritt(id));
       }
       return;
@@ -2197,6 +2286,7 @@ const App = (() => {
       }
     }
     const sum = mk(k, 'p', 'sammanfattning', `${S.utv.antalOk} av ${S.utv.scen.length} situationer klaras.`); sum.setAttribute('role', 'status');
+    if (t.egen) egenForm(k);
 
     if (S.utv.alla) {
       const lista2 = Motor.slingor(S.def, Motor.grundpar(S.def)), neg = lista2.filter(s => s.typ === 'negativ').length, pos = lista2.length - neg;
@@ -2211,6 +2301,32 @@ const App = (() => {
   }
 
 
+
+  // Egen mätning (undersökning 2): fyra pulsvärden efter att rörelsen slutat. Värdena finns bara i webbläsarens minne.
+  const EGEN_TIDER = [15, 75, 135, 195];
+  const talEgen = v => { const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 30 && n <= 230 ? n : null; };
+  const egenVila = () => talEgen(S.egen.vila);
+  function egenPunkter() {
+    const b = S.hand.find(e => e.typ === 'belastning' && e.mal === 'vilobehov') || S.hand.find(e => e.typ === 'belastning');
+    if (!b) return [];
+    const slut = b.t + b.langd, ut = [];
+    EGEN_TIDER.forEach((d, i) => { const y = talEgen(S.egen.p[i]); if (y != null && slut + d <= S.main.langd) ut.push({ x: slut + d, y }); });
+    return ut;
+  }
+  function egenForm(k) {
+    mk(k, 'h2', '', 'Din egen mätning').style.marginTop = '12px';
+    mk(k, 'p', 'dim', 'Skriv in pulsen (slag/min) från din undersökning, mätt efter att rörelsen slutat. Värdena används bara här i webbläsaren: de sparas eller skickas inte.');
+    const rad = mk(k, 'div', 'egenrad');
+    const falt = (etikett, hamta, satt) => {
+      const l = mk(rad, 'label', 'egenfalt'); mk(l, 'span', '', etikett);
+      const i = mk(l, 'input'); i.type = 'text'; i.inputMode = 'numeric'; i.maxLength = 3; i.value = hamta(); i.setAttribute('aria-label', etikett);
+      i.addEventListener('input', () => { satt(i.value); ritaAllt(); });
+    };
+    falt('Vila', () => S.egen.vila, v => { S.egen.vila = v; });
+    EGEN_TIDER.forEach((d, n) => falt(d + ' s', () => S.egen.p[n], v => { S.egen.p[n] = v; }));
+    mk(k, 'p', 'dim', 'Kurvan ritas när minst två värden är ifyllda. Välj eller lägg in rörelsen i förloppet först.').style.marginTop = '4px';
+  }
+
   const DOM = { haller: 'håller sig kring börvärdet', 'ny-niva': 'hamnar på en ny nivå', 'nar-taket': 'skenar upp till taket', tomms: 'töms', svanger: 'svänger kring börvärdet' };
   function byggKortFritt() {
     const t = S.task, k = $('bygg-kort'); k.innerHTML = '';
@@ -2224,9 +2340,9 @@ const App = (() => {
 
     mk(k, 'h2', '', 'Störningar').style.marginTop = '12px';
     const tid = mk(k, 'div', 'reglage');
-    const lab = mk(tid, 'label'); mk(lab, 'span', '', 'Tidpunkt'); const out = mk(lab, 'output', '', S.hTid + ' min');
+    const lab = mk(tid, 'label'); mk(lab, 'span', '', 'Tidpunkt'); const out = mk(lab, 'output', '', S.hTid + ' ' + S.tid);
     const inp = mk(tid, 'input'); inp.type = 'range'; inp.min = 0; inp.max = 300; inp.step = 5; inp.value = S.hTid; inp.setAttribute('aria-label', 'Tidpunkt för störningen'); inp.id = 'h-tid';
-    inp.addEventListener('input', () => { S.hTid = +inp.value; out.textContent = S.hTid + ' min'; });
+    inp.addEventListener('input', () => { S.hTid = +inp.value; out.textContent = S.hTid + ' ' + S.tid; });
     const nm = id => ByggeModell.spec(t, id).namn;
     const stor = t.system.noder.filter(n => n.typ === 'storning' && S.B.noder[n.id]);
     for (const st of stor) {
@@ -2240,20 +2356,20 @@ const App = (() => {
     }
     const eff = t.system.noder.filter(n => n.typ === 'effektor' && S.B.noder[n.id]);
     if (eff.length) {
-      const g = mk(k, 'div', 'grupp'); mk(g, 'h3', '', 'Ändra flödet i 30 min');
+      const g = mk(k, 'div', 'grupp'); mk(g, 'h3', '', `Ändra flödet i ${t.belLangd || 30} ${S.tid}`);
       const s1 = mk(g, 'select'); s1.id = 'bel-mal'; s1.setAttribute('aria-label', 'Vilket flöde');
       for (const e of eff) { const o = mk(s1, 'option', '', e.namn); o.value = e.id; }
       const s2 = mk(g, 'select'); s2.id = 'bel-faktor'; s2.setAttribute('aria-label', 'Hur mycket'); s2.style.marginLeft = '6px';
-      for (const [txt, v] of [['Stäng av', 0], ['Halvera', 0.5], ['Dubbla', 2], ['Tredubbla', 3]]) { const o = mk(s2, 'option', '', txt); o.value = v; }
+      for (const [txt, v] of [['Stäng av', 0], ['Halvera', 0.5], ['Dubbla', 2], ['Tredubbla', 3], ['Femdubbla', 5]]) { const o = mk(s2, 'option', '', txt); o.value = v; }
       s2.value = 3;
       const b = mk(g, 'button', 'knapp liten', 'Lägg in'); b.type = 'button'; b.id = 'bel-knapp'; b.style.marginLeft = '6px';
-      b.addEventListener('click', () => laggHandelse({ typ: 'belastning', mal: s1.value, faktor: +s2.value, langd: 30, etikett: 'Flöde ×' + String(+s2.value).replace('.', ',') }));
+      b.addEventListener('click', () => laggHandelse({ typ: 'belastning', mal: s1.value, faktor: +s2.value, langd: t.belLangd || 30, etikett: 'Flöde ×' + String(+s2.value).replace('.', ',') }));
     }
     if (!stor.length && !eff.length) mk(k, 'p', 'dim', 'Lägg till en störning eller en ventil för att kunna prova kretsen.');
     if (S.fhand.length) {
       const l = mk(k, 'ul', 'handelser');
       S.fhand.forEach((e, i) => {
-        const li = mk(l, 'li'); mk(li, 'span', '', `${Math.round(e.t)} min: ${e.etikett} (${nm(e.mal)})`);
+        const li = mk(l, 'li'); mk(li, 'span', '', `${Math.round(e.t)} ${S.tid}: ${e.etikett} (${nm(e.mal)})`);
         const x = mk(li, 'button', 'knapp liten', '✕'); x.type = 'button'; x.setAttribute('aria-label', 'Ta bort händelsen'); x.dataset.taBort = i;
         x.addEventListener('click', () => { S.fhand.splice(i, 1); efterByggandring(); });
       });
@@ -2270,6 +2386,7 @@ const App = (() => {
       mk(d, 'div', 'dim', `start ${fmt(r.start, 0)} · högst ${fmt(r.topp, 0)} · lägst ${fmt(r.lagst, 0)} · slut ${fmt(r.slut, 0)}`);
     }
     mk(k, 'p', 'dim', 'Tryck Start för att se förloppet.').style.marginTop = '6px';
+    if (t.egen) egenForm(k);
   }
 
   function laggHandelse(e) {
@@ -2345,6 +2462,8 @@ const App = (() => {
       lank.addEventListener('click', () => ByggeVy.valj({ typ: 'kant', idx: i }));
       mk(rad, 'span', 'tecken ' + (tecken > 0 ? 'tecken-pa' : 'tecken-av'), tecken > 0 ? '+' : '−');
     }
+    if (sp.drivs && S.B.noder[sp.drivs]) mk(kopp, 'p', 'dim', `${sp.namn} drivs av ${nm(sp.drivs).toLowerCase()}: högre värde ger större flöde.`);
+    for (const n of t.system.noder) if (n.drivs === id && S.B.noder[n.id]) mk(kopp, 'p', 'dim', `${nm(id)} driver ${n.namn.toLowerCase()}: högre värde ger större flöde.`);
     if (['storhet', 'sensor', 'signal'].includes(sp.typ) || (t.fritt && ['effektor', 'storning'].includes(sp.typ))) {
       const mal = Object.keys(S.B.noder).filter(x => x !== id && ByggeModell.kontrolleraKoppling(t, S.B, id, x).ok && !S.B.kopplingar.some(k => k.fran === id && k.till === x));
       const lab = mk(kopp, 'label', 'dim', 'Koppla till'); lab.setAttribute('for', 'koppla-till');
@@ -2475,7 +2594,9 @@ const App = (() => {
   function ritaAllt() {
     const u = bygg() ? S.task : S.uppdrag, m = S.main, lag = bygg();
     const hand = S.hand.map(e => ({ t: e.t, etikett: etikett(e) }));
-    $('ford-frisk').hidden = !S.frisk; $('ford-pred').hidden = S.pred.length < 2;
+    const egenP = lag && S.task.egen ? egenPunkter() : null;
+    $('ford-frisk').hidden = !S.frisk; $('ford-pred').hidden = egenP ? egenP.length < 2 : S.pred.length < 2;
+    $('ford-pred-text').textContent = egenP ? 'din mätning' : 'din förutsägelse';
     const fr = lag && S.task.fritt, hs = fr && S.task.huvud ? ByggeModell.spec(S.task, S.huvud) : null, hv = hs ? hs.vis : null;
     $('kurv-titel').textContent = fr ? (hs ? hs.namn + (S.enhet ? ` (${S.enhet})` : '') : 'Ingen storhet än') : (lag ? `${ByggeModell.spec(S.task, S.huvud).namn} (${S.enhet})` : 'Blodglukos (mmol/l)');
     const val = $('kurv-val'); val.hidden = !fr || !hs;
@@ -2486,19 +2607,19 @@ const App = (() => {
     }
     $('kurv-tips').textContent = (S.ritar && !S.harSpelat && !u.fri) ? 'Dra i kurvan för att rita din förutsägelse' : 'Dra i kurvan för att bläddra i tiden';
     dg.rita({
-      langd: m.langd, ymin: fr ? (hv ? hv.min : 0) : (lag ? u.ymin : 0), ymax: fr ? (hv ? hv.max : 100) : u.ymax,
-      ystep: fr ? fin((hv ? hv.max - hv.min : 100)) : (lag ? (u.ymax - u.ymin <= 6 ? 1 : 2) : (u.ymax <= 8 ? 1 : (u.ymax <= 14 ? 2 : 5))), dt: m.dt, cursor: S.cursor,
+      tidenhet: S.tid, langd: m.langd, ymin: fr ? (hv ? hv.min : 0) : (lag ? u.ymin : 0), ymax: fr ? (hv ? hv.max : 100) : u.ymax,
+      ystep: fr ? fin((hv ? hv.max - hv.min : 100)) : (lag ? (u.ymax - u.ymin <= 6 ? 1 : (u.ymax - u.ymin <= 16 ? 2 : fin(u.ymax - u.ymin))) : (u.ymax <= 8 ? 1 : (u.ymax <= 14 ? 2 : 5))), dt: m.dt, cursor: S.cursor,
       band: fr ? (S.task.band && S.huvud === S.task.mallhuvud ? S.task.band : null) : (lag ? u.band : [4, 6]),
-      bord: fr ? (hs ? (S.huvud === S.task.mallhuvud && S.task.bord != null ? S.task.bord : hs.start) : null) : S.bord, handelser: hand, markorer: true,
-      serier: [{ y: m.ser[S.huvud], klass: 's-glukos' }], frisk: S.frisk ? S.frisk.ser.G : null, pred: S.pred,
+      bord: egenP && egenVila() != null ? egenVila() : (fr ? (hs ? (S.huvud === S.task.mallhuvud && S.task.bord != null ? S.task.bord : hs.start) : null) : S.bord), handelser: hand, markorer: true,
+      serier: [{ y: m.ser[S.huvud], klass: 's-glukos' }], frisk: S.frisk ? S.frisk.ser.G : null, pred: egenP || S.pred,
       lapp: (S.ritar && !S.harSpelat && !u.fri && S.pred.length < 2) ? 'Rita din förutsägelse här' : '',
     });
     const KL = ['s-insulin', 's-glukagon', 's-tredje'];
     const namn = id => S.def.noder.find(n => n.id === id).namn;
     dh.rita({
-      langd: m.langd, ymin: 0, ymax: 2, ystep: 0.5, dt: m.dt, cursor: S.cursor, handelser: hand, markorer: false,
+      tidenhet: S.tid, langd: m.langd, ymin: 0, ymax: 2, ystep: 0.5, dt: m.dt, cursor: S.cursor, handelser: hand, markorer: false,
       ytext: v => (v === 0 ? '0' : (v === 1 ? '1' : '')),
-      titel: 'Hormoner, relativ nivå', legend: S.horm.map((id, k) => ({ t: namn(id), k: KL[k % 3] })),
+      titel: (lag && S.task.signaltitel) || 'Hormoner, relativ nivå', legend: S.horm.map((id, k) => ({ t: namn(id), k: KL[k % 3] })),
       serier: S.horm.map((id, k) => ({ y: m.ser[id], klass: KL[k % 3] })),
     });
   }
@@ -2517,7 +2638,7 @@ const App = (() => {
       }
     }
     dg.flytta(S.cursor); dh.flytta(S.cursor);
-    $('tid-rad').textContent = `t = ${String(Math.round(S.cursor)).padStart(3, ' ')} min · ${fmt(S.main.ser[S.huvud][i], S.dec)} ${S.enhet}`;
+    $('tid-rad').textContent = `t = ${String(Math.round(S.cursor)).padStart(3, ' ')} ${S.tid} · ${fmt(S.main.ser[S.huvud][i], S.dec)} ${S.enhet}`;
     $('spela-knapp').textContent = S.spelar ? '⏸ Paus' : (S.cursor >= S.main.langd - 1 ? '▶ Spela igen' : '▶ Start');
     justNu();
   }
