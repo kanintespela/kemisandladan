@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<!-- © 2026 Christian Broselid. All rights reserved. -->
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kroppens termostat 0.1</title>
+<script id="tema-start">
+  // Tema före första ritningen, så att sidan inte blinkar till i fel tema.
+  // Ett sparat val (temaknappen) gäller i alla apparna på webbplatsen;
+  // utan sparat val följer appen datorns inställning.
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('kemiappar-tema'); } catch (e) {}
+    if (t !== 'ljust' && t !== 'morkt') t = matchMedia('(prefers-color-scheme: light)').matches ? 'ljust' : 'morkt';
+    document.documentElement.dataset.tema = t;
+  })();
+</script>
+<style>
+  :root {
+    --bg:        #080c10;
+    --bg2:       #0d1520;
+    --bg3:       #111e2e;
+    --border:    #1e3a52;
+    --accent:    #00d4ff;
+    --text:      #c8dce8;
+    --text-dim:  #7f9db0;
+    --varm:      #ff6b5a;
+    --kall:      #4db3ff;
+    --lugn:      #00ff9d;
+    --svett:     #8fdcff;
+    --mat:       #ff9f43;
+    --fara:      #ef4444;
+    --font-ui:   system-ui, sans-serif;
+    --font-mono: 'Courier New', monospace;
+    --hud-lag:   #b9b4d6;
+    --hud-mitt:  #e7a987;
+    --hud-hog:   #ff7a6b;
+    --trojja:    #2d6a8a;
+    --byxor:     #2a3b55;
+    --jacka:     #7a3f5c;
+    --mark:      #1a2a3a;
+  }
+  :root[data-tema="ljust"] {
+    --bg:        #eef2f6;
+    --bg2:       #ffffff;
+    --bg3:       #e4ebf1;
+    --border:    #bccbd7;
+    --accent:    #0072a3;
+    --text:      #18252f;
+    --text-dim:  #52687a;
+    --varm:      #d2452f;
+    --kall:      #1f6fbf;
+    --lugn:      #00805a;
+    --svett:     #2b8fcf;
+    --mat:       #b45309;
+    --fara:      #c62828;
+    --hud-lag:   #b3aed3;
+    --hud-mitt:  #e3a17c;
+    --hud-hog:   #f0705f;
+    --trojja:    #3f88ad;
+    --byxor:     #34496a;
+    --jacka:     #94506f;
+    --mark:      #c9d6e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font-ui);
+    font-size: 15px; line-height: 1.45; height: 100vh;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding-block: 6px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .2px; }
+  .hem-lank { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  .hem-lank:hover { color: var(--accent); }
+  .dim { color: var(--text-dim); font-size: 13px; }
+  .knapp, .tema-knapp {
+    background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .knapp:hover, .tema-knapp:hover { border-color: var(--accent); }
+  .knapp.primar { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+  :root[data-tema="ljust"] .knapp.primar { color: #fff; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tema-knapp { padding: 5px 8px; display: flex; margin-left: auto; }
+  .tema-knapp svg { width: 18px; height: 18px; }
+  .ikon-sol { display: block; } .ikon-mane { display: none; }
+  :root[data-tema="ljust"] .ikon-sol { display: none; }
+  :root[data-tema="ljust"] .ikon-mane { display: block; }
+  .styr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tid { font-family: var(--font-mono); font-size: 14px; color: var(--text-dim); min-width: 96px; }
+
+  .segment { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .segment button { background: var(--bg3); color: var(--text); border: 0; border-right: 1px solid var(--border); padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; flex: 1; }
+  .segment button:last-child { border-right: 0; }
+  .segment button[aria-pressed="true"] { background: var(--accent); color: var(--bg); font-weight: 600; }
+  :root[data-tema="ljust"] .segment button[aria-pressed="true"] { color: #fff; }
+
+  main {
+    flex: 1; display: grid; gap: 8px; min-height: 0;
+    padding-block: 8px; padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
+    grid-template-columns: 258px minmax(0, 1fr) 318px;
+    grid-template-rows: minmax(0, 1fr) 176px;
+    grid-template-areas: "v s h" "v g h";
+  }
+  .panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; min-height: 0; }
+  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .7px; color: var(--text-dim); margin-bottom: 8px; font-weight: 600; }
+  .vanster { grid-area: v; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; }
+  .scen { grid-area: s; padding: 0; overflow: hidden; position: relative; }
+  .hoger { grid-area: h; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; min-height: 0; }
+  .hoger .panel { padding: 9px 12px; }
+  .hoger .panel h2 { margin-bottom: 6px; }
+  .graf { grid-area: g; padding: 6px 10px 4px; display: flex; flex-direction: column; }
+
+  /* Reglage */
+  .falt { display: flex; flex-direction: column; gap: 6px; }
+  .falt-rad { display: flex; justify-content: space-between; align-items: baseline; }
+  .falt label, .falt .etikett { font-size: 13px; color: var(--text-dim); }
+  .varde { font-family: var(--font-mono); font-size: 15px; font-weight: 700; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .skala { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-top: -4px; }
+  .vaxel { display: flex; align-items: center; gap: 9px; font-size: 14px; cursor: pointer; user-select: none; }
+  .vaxel input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .vaxel .spar { width: 34px; height: 19px; border-radius: 10px; background: var(--bg3); border: 1px solid var(--border); position: relative; flex: none; transition: background .2s; }
+  .vaxel .spar::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--text-dim); transition: transform .2s, background .2s; }
+  .vaxel input:checked + .spar { background: color-mix(in srgb, var(--accent) 35%, var(--bg3)); border-color: var(--accent); }
+  .vaxel input:checked + .spar::after { transform: translateX(15px); background: var(--accent); }
+  .vaxel input:focus-visible + .spar { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .vaxel.feber input:checked + .spar { background: color-mix(in srgb, var(--varm) 35%, var(--bg3)); border-color: var(--varm); }
+  .vaxel.feber input:checked + .spar::after { background: var(--varm); }
+  .snabbval { display: flex; flex-direction: column; gap: 6px; }
+  .snabbval .knapp { text-align: left; font-size: 13px; padding: 6px 10px; }
+
+  /* Scen */
+  #scen-svg { width: 100%; height: 100%; display: block; }
+  svg text { font-family: var(--font-ui); fill: var(--text); }
+  .etikett-t { font-size: 13px; fill: var(--text-dim); transition: fill .3s; }
+  .etikett-t.aktiv { fill: var(--text); font-weight: 600; }
+  .ledare { stroke: var(--text-dim); stroke-width: 1; opacity: .55; }
+  .nerv { fill: none; stroke: var(--text-dim); stroke-width: 1.6; stroke-dasharray: 2 5; stroke-linecap: round; opacity: .45; }
+  .forklaring { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--text-dim); display: flex; gap: 14px; flex-wrap: wrap; pointer-events: none; }
+  .forklaring span::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; background: var(--c); box-shadow: 0 0 6px var(--c); }
+
+  /* Höger */
+  .avlasning { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+  .stor-temp { font-family: var(--font-mono); font-size: 40px; font-weight: 700; line-height: 1; transition: color .4s; }
+  .stor-temp small { font-size: 20px; font-weight: 400; }
+  .smavarden { font-size: 13px; color: var(--text-dim); text-align: right; line-height: 1.5; }
+  .smavarden b { color: var(--text); font-family: var(--font-mono); }
+  .status { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 14px; font-weight: 600; border: 1px solid; transition: color .3s, border-color .3s, background .3s; }
+  .status.lugn { color: var(--lugn); border-color: color-mix(in srgb, var(--lugn) 45%, transparent); background: color-mix(in srgb, var(--lugn) 9%, transparent); }
+  .status.varm { color: var(--varm); border-color: color-mix(in srgb, var(--varm) 45%, transparent); background: color-mix(in srgb, var(--varm) 9%, transparent); }
+  .status.kall { color: var(--kall); border-color: color-mix(in srgb, var(--kall) 45%, transparent); background: color-mix(in srgb, var(--kall) 9%, transparent); }
+  .status.fara { color: #fff; border-color: var(--fara); background: var(--fara); }
+
+  #slinga-svg { width: 100%; height: auto; display: block; }
+  .nod rect { fill: var(--bg3); stroke: var(--border); stroke-width: 1.5; transition: stroke .4s, fill .4s; }
+  .nod text { font-size: 11.5px; }
+  .nod .rubrik { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; fill: var(--text-dim); font-weight: 600; }
+  .slinga-pil { fill: none; stroke: var(--border); stroke-width: 2.5; transition: stroke .4s; }
+
+  .matare { display: flex; flex-direction: column; gap: 7px; }
+  .matare-rad { display: grid; grid-template-columns: 112px 1fr; align-items: center; gap: 8px; font-size: 13px; }
+  .matare-rad .namn { color: var(--text-dim); }
+  .stapel { height: 12px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .stapel .fyll { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 6px; }
+  .stapel .mitt { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--text-dim); opacity: .6; }
+  .stapel .markor { position: absolute; top: -1px; bottom: -1px; width: 10px; margin-left: -5px; border-radius: 5px; transition: background .3s; }
+  .stapel.ur-funktion { background: repeating-linear-gradient(45deg, var(--bg3) 0 5px, var(--border) 5px 7px); }
+  .stapel-skala { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-dim); margin-top: 1px; }
+
+  .balans { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .balans-rad { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 8px; }
+  .balans-rad .namn { color: var(--text-dim); }
+  .balans-stapel { height: 16px; display: flex; border-radius: 4px; overflow: hidden; background: var(--bg3); }
+  .balans-stapel div { height: 100%; transition: width .25s; }
+  .balans-text { font-size: 12.5px; color: var(--text-dim); }
+  .nyckel { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--text-dim); }
+  .nyckel span::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; background: var(--c); vertical-align: -1px; }
+
+  #graf-svg { width: 100%; flex: 1; min-height: 0; display: block; }
+  .graf-rubrik { display: flex; justify-content: space-between; align-items: baseline; }
+
+  @media (max-width: 1050px) {
+    body { height: auto; }
+    main { grid-template-columns: 1fr; grid-template-rows: auto;
+      grid-template-areas: "s" "h" "v" "g"; }
+    .scen { aspect-ratio: 600 / 560; }
+    .graf { height: 190px; }
+  }
+  @media (max-width: 520px) {
+    main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+    .stor-temp { font-size: 36px; }
+    .forklaring { font-size: 11px; gap: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="hem-lank" href="../biologi/" title="Alla biologiappar">← Biologiappar</a>
+  <h1>Kroppens termostat</h1>
+  <span class="dim">Homeostas: kroppstemperaturen</span>
+  <span class="styr" role="group" aria-label="Tid">
+    <button class="knapp primar" id="spela-knapp" type="button">❚❚ Paus</button>
+    <button class="knapp" id="borja-om" type="button">↺ Börja om</button>
+    <span class="segment" id="fart" role="group" aria-label="Hastighet">
+      <button type="button" data-fart="60" aria-pressed="false">Långsam</button>
+      <button type="button" data-fart="150" aria-pressed="true">Normal</button>
+      <button type="button" data-fart="420" aria-pressed="false">Snabb</button>
+    </span>
+    <span class="tid" id="tid-rad" aria-label="Tid i modellen"></span>
+  </span>
+  <button class="tema-knapp" id="tema-knapp" type="button" aria-label="Byt tema" title="Byt tema">
+    <svg class="ikon-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="ikon-mane" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z" fill="currentColor"/></svg>
+  </button>
+</header>
+
+<main>
+  <aside class="vanster">
+    <section class="panel">
+      <h2>Omgivning</h2>
+      <div class="falt">
+        <div class="falt-rad"><label for="omgivning">Lufttemperatur</label><span class="varde" id="omgivning-varde"></span></div>
+        <input type="range" id="omgivning" min="-15" max="45" step="1" value="22">
+        <div class="skala"><span>−15 °C</span><span>45 °C</span></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Kroppen</h2>
+      <div class="falt">
+        <span class="etikett" id="aktivitet-etikett">Aktivitet</span>
+        <span class="segment" id="aktivitet" role="group" aria-labelledby="aktivitet-etikett">
+          <button type="button" data-varde="vila" aria-pressed="true">Vila</button>
+          <button type="button" data-varde="promenad" aria-pressed="false">Promenad</button>
+          <button type="button" data-varde="lopning" aria-pressed="false">Löpning</button>
+        </span>
+      </div>
+      <div class="falt" style="margin-top:12px">
+        <span class="etikett" id="klader-etikett">Kläder</span>
+        <span class="segment" id="klader" role="group" aria-labelledby="klader-etikett">
+          <button type="button" data-varde="tunna" aria-pressed="false">Tunna</button>
+          <button type="button" data-varde="vanliga" aria-pressed="true">Vanliga</button>
+          <button type="button" data-varde="varma" aria-pressed="false">Varma</button>
+        </span>
+      </div>
+      <label class="vaxel feber" style="margin-top:14px"><input type="checkbox" id="feber"><span class="spar"></span>Infektion med feber</label>
+    </section>
+    <section class="panel">
+      <h2>Effektorer som fungerar</h2>
+      <div class="falt" style="gap:9px">
+        <label class="vaxel"><input type="checkbox" id="eff-blodkarl" checked><span class="spar"></span>Hudens blodkärl</label>
+        <label class="vaxel"><input type="checkbox" id="eff-svett" checked><span class="spar"></span>Svettkörtlar</label>
+        <label class="vaxel"><input type="checkbox" id="eff-skak" checked><span class="spar"></span>Skakningar i musklerna</label>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Prova</h2>
+      <div class="snabbval" id="snabbval"></div>
+    </section>
+  </aside>
+
+  <section class="panel scen" aria-label="Kroppen i sin omgivning">
+    <svg id="scen-svg" viewBox="0 0 600 560" preserveAspectRatio="xMidYMid meet" role="img" aria-label="En människa vars hud, svett, muskler och nervsignaler visar hur temperaturen regleras"></svg>
+    <div class="forklaring">
+      <span style="--c:var(--varm)">signal: för varmt</span>
+      <span style="--c:var(--kall)">signal: för kallt</span>
+    </div>
+  </section>
+
+  <aside class="hoger">
+    <section class="panel">
+      <h2>Kärntemperatur</h2>
+      <div class="avlasning">
+        <div class="stor-temp" id="kärna-varde" aria-live="off"></div>
+        <div class="smavarden">Börvärde <b id="borvarde-varde"></b><br>Hud <b id="hud-varde"></b></div>
+      </div>
+      <div class="status lugn" id="status" role="status"></div>
+    </section>
+    <section class="panel">
+      <h2>Negativ återkoppling</h2>
+      <svg id="slinga-svg" viewBox="0 0 294 212" role="img" aria-label="Återkopplingsslingan"></svg>
+    </section>
+    <section class="panel">
+      <h2>Effektorer</h2>
+      <div class="matare">
+        <div>
+          <div class="matare-rad"><span class="namn">Blodkärl i huden</span><div class="stapel" id="stapel-karl"><div class="mitt" style="left:35%"></div><div class="markor"></div></div></div>
+          <div class="matare-rad"><span></span><div class="stapel-skala"><span>sammandragna</span><span>vidgade</span></div></div>
+        </div>
+        <div class="matare-rad"><span class="namn">Svettning</span><div class="stapel" id="stapel-svett"><div class="fyll" style="background:var(--svett)"></div></div></div>
+        <div class="matare-rad"><span class="namn">Skakningar</span><div class="stapel" id="stapel-skak"><div class="fyll" style="background:var(--kall)"></div></div></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Värmebalans</h2>
+      <div class="balans">
+        <div class="balans-rad"><span class="namn">Värme in</span><div class="balans-stapel" id="balans-in"></div></div>
+        <div class="balans-rad"><span class="namn">Värme ut</span><div class="balans-stapel" id="balans-ut"></div></div>
+        <div class="nyckel">
+          <span style="--c:var(--mat)">ämnesomsättning</span>
+          <span style="--c:var(--kall)">skakningar</span>
+          <span style="--c:#f7c948">från omgivningen</span>
+          <span style="--c:var(--varm)">via huden</span>
+          <span style="--c:var(--svett)">avdunstning</span>
+        </div>
+        <div class="balans-text" id="balans-text"></div>
+      </div>
+    </section>
+  </aside>
+
+  <section class="panel graf">
+    <div class="graf-rubrik"><h2>Kärntemperatur (°C) de senaste två timmarna</h2><span class="dim" id="graf-not"></span></div>
+    <svg id="graf-svg" role="img" aria-label="Kärntemperaturen över tid"></svg>
+  </section>
+</main>
+
+<script>
+'use strict';
+const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace('.', ',').replace('-', '−');
+const klamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+/* =========================================================================
+   Modell: ren och utan DOM, så att den kan testas i node.
+   En kärna med en temperatur T (°C) och värmekapacitet C. Värme bildas av
+   ämnesomsättning och skakningar och avges via huden (strålning, ledning,
+   konvektion) och genom avdunstning av svett. Hypotalamus jämför en samlad
+   temperatursignal (kärnan och huden) med börvärdet och styr tre effektorer,
+   som var och en följer sin styrsignal med en fördröjning.
+   ========================================================================= */
+const PARAM = {
+  C: 245000,                // J/K, ungefär 70 kg × 3,5 kJ/(kg·K)
+  basal: 80,                // W, ämnesomsättning i vila
+  aktivitet: { vila: 0, promenad: 170, lopning: 600 },   // W extra värme från arbetande muskler
+  skakMax: 250,             // W extra vid fullt skakande
+  Kmin: 3, Kmax: 12,        // W/K, värmeledning via huden vid sammandragna resp. vidgade blodkärl
+  klader: { tunna: 1.5, vanliga: 1.0, varma: 0.55 },     // faktor på värmeledningen
+  Ebas: 10,                 // W, avdunstning utan svett (andning, hud)
+  Emax: 700,                // W, maximal kylning genom svett
+  vNeutral: 0.35,           // blodkärlens läge när ingen reglering behövs
+  hudVikt: 0.02,            // hur mycket hudens temperatur väger in i hypotalamus signal
+  hudNeutral: 32.5,
+  tau: { v: 90, s: 150, k: 60 },   // s, effektorernas fördröjning
+  borvarde: 37.0, borvardeFeber: 39.0,
+};
+
+const Modell = {
+  nyttTillstand() {
+    return { t: 0, T: 37.0, v: 0.2, s: 0, k: 0 };
+  },
+  standardInstallning() {
+    return { omgivning: 22, aktivitet: 'vila', klader: 'vanliga', feber: false,
+             blodkarl: true, svett: true, skak: true };
+  },
+  borvarde(inst) { return inst.feber ? PARAM.borvardeFeber : PARAM.borvarde; },
+  hud(T, Ta, v, s) {
+    // Huden ligger mellan omgivningen och kärnan; vidgade blodkärl drar den mot kärnan, svett kyler den.
+    return Ta + (T - Ta) * (0.55 + 0.35 * v) - 2 * s;
+  },
+  signal(z, inst) {
+    // Samlad signal till hypotalamus: kärnans avvikelse från börvärdet plus ett litet bidrag från huden.
+    const Ts = this.hud(z.T, inst.omgivning, z.v, z.s);
+    return (z.T - this.borvarde(inst)) + PARAM.hudVikt * (Ts - PARAM.hudNeutral);
+  },
+  mal(e, inst) {
+    return {
+      v: inst.blodkarl ? klamp(PARAM.vNeutral + 1.6 * e, 0, 1) : PARAM.vNeutral,
+      s: inst.svett ? klamp(1.4 * (e - 0.15), 0, 1) : 0,
+      k: inst.skak ? klamp(1.5 * (-e - 0.25), 0, 1) : 0,
+    };
+  },
+  floden(z, inst) {
+    const K = (PARAM.Kmin + (PARAM.Kmax - PARAM.Kmin) * z.v) * PARAM.klader[inst.klader];
+    const amne = PARAM.basal + PARAM.aktivitet[inst.aktivitet];
+    const skak = PARAM.skakMax * z.k;
+    const hud = K * (z.T - inst.omgivning);          // negativt = kroppen tar upp värme från omgivningen
+    const avdunst = PARAM.Ebas + PARAM.Emax * z.s;
+    return { amne, skak, hud, avdunst, netto: amne + skak - hud - avdunst };
+  },
+  steg(z, inst, dt) {
+    const e = this.signal(z, inst);
+    const m = this.mal(e, inst);
+    const f = this.floden(z, inst);
+    const n = { t: z.t + dt };
+    n.T = klamp(z.T + f.netto / PARAM.C * dt, 28, 44);
+    n.v = z.v + (m.v - z.v) * Math.min(1, dt / PARAM.tau.v);
+    n.s = z.s + (m.s - z.s) * Math.min(1, dt / PARAM.tau.s);
+    n.k = z.k + (m.k - z.k) * Math.min(1, dt / PARAM.tau.k);
+    return n;
+  },
+  kor(z, inst, sekunder, dt = 5) {
+    for (let i = 0; i < sekunder / dt; i++) z = this.steg(z, inst, dt);
+    return z;
+  },
+  lage(z, inst) {
+    // Vilken slinga som är igång: 'varm' (kroppen kyls), 'kall' (kroppen värms) eller 'lugn'.
+    const e = this.signal(z, inst);
+    if (z.T >= 40 || z.T < 35) return 'fara';
+    if (e > 0.12) return 'varm';
+    if (e < -0.18) return 'kall';
+    return 'lugn';
+  },
+};
+
+const SNABBVAL = [
+  { namn: 'Vanlig dag inomhus', inst: { omgivning: 22, aktivitet: 'vila', klader: 'vanliga', feber: false, blodkarl: true, svett: true, skak: true } },
+  { namn: 'Väntan i snöstorm', inst: { omgivning: -10, aktivitet: 'vila', klader: 'vanliga', feber: false, blodkarl: true, svett: true, skak: true } },
+  { namn: 'Löprunda en het dag', inst: { omgivning: 32, aktivitet: 'lopning', klader: 'tunna', feber: false, blodkarl: true, svett: true, skak: true } },
+  { namn: 'Feber', inst: { omgivning: 22, aktivitet: 'vila', klader: 'vanliga', feber: true, blodkarl: true, svett: true, skak: true } },
+  { namn: 'Löprunda utan svettning', inst: { omgivning: 32, aktivitet: 'lopning', klader: 'tunna', feber: false, blodkarl: true, svett: false, skak: true } },
+];
+
+const TEXT = {
+  akt: { vila: 'vila', promenad: 'promenad', lopning: 'löpning' },
+  klader: { tunna: 'tunna kläder', vanliga: 'vanliga kläder', varma: 'varma kläder' },
+  slinga: {
+    varm: { forandring: ['Temperaturen', 'över börvärdet'], receptor: ['Värmereceptorer', 'i hud och hjärna'], centrum: ['Hypotalamus', 'jämför med börvärdet'], effektor: ['Blodkärlen vidgas,', 'svettkörtlarna arbetar'], svar: ['Mer värme avges:', 'temperaturen sjunker'] },
+    kall: { forandring: ['Temperaturen', 'under börvärdet'], receptor: ['Köldreceptorer', 'i hud och hjärna'], centrum: ['Hypotalamus', 'jämför med börvärdet'], effektor: ['Blodkärlen dras ihop,', 'musklerna skakar'], svar: ['Mindre avges, mer bildas:', 'temperaturen stiger'] },
+    lugn: { forandring: ['Temperaturen', 'nära börvärdet'], receptor: ['Temperatur-', 'receptorer'], centrum: ['Hypotalamus', 'jämför med börvärdet'], effektor: ['Små ändringar', 'av blodflödet i huden'], svar: ['Temperaturen', 'hålls stabil'] },
+  },
+};
+
+/* =========================================================================
+   Gränssnitt (körs bara i webbläsaren)
+   ========================================================================= */
+if (typeof document !== 'undefined') {
+  const NS = 'http://www.w3.org/2000/svg';
+  const $ = id => document.getElementById(id);
+  const el = (namn, attr = {}, foralder) => {
+    const n = document.createElementNS(NS, namn);
+    for (const k in attr) n.setAttribute(k, attr[k]);
+    if (foralder) foralder.appendChild(n);
+    return n;
+  };
+  const css = namn => getComputedStyle(document.documentElement).getPropertyValue(namn).trim();
+  const minskadRorelse = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- tillstånd ----------
+  let inst = Modell.standardInstallning();
+  let z = Modell.kor(Modell.nyttTillstand(), inst, 1800);
+  z.t = 0;
+  let historik = [{ t: 0, T: z.T, sp: Modell.borvarde(inst) }];
+  let handelser = [];
+  let spelar = true;
+  let fart = 150;           // modellsekunder per verklig sekund
+  let ackumulerat = 0;
+
+  // ---------- tema ----------
+  $('tema-knapp').addEventListener('click', () => {
+    const t = document.documentElement.dataset.tema === 'ljust' ? 'morkt' : 'ljust';
+    document.documentElement.dataset.tema = t;
+    try { localStorage.setItem('kemiappar-tema', t); } catch (e) {}
+    lasFarger(); ritaKlader(); ritaGraf();
+  });
+
+  let F = {};
+  function lasFarger() {
+    for (const k of ['bg', 'bg2', 'bg3', 'border', 'accent', 'text', 'text-dim', 'varm', 'kall', 'lugn', 'svett', 'mat', 'fara', 'hud-lag', 'hud-mitt', 'hud-hog', 'trojja', 'byxor', 'jacka', 'mark'])
+      F[k] = css('--' + k);
+    F.ljust = document.documentElement.dataset.tema === 'ljust';
+  }
+  lasFarger();
+
+  // ---------- färghjälp ----------
+  const hex2rgb = h => { h = h.replace('#', ''); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)); };
+  const blanda = (a, b, t) => { const A = hex2rgb(a), B = hex2rgb(b); return `rgb(${A.map((x, i) => Math.round(x + (B[i] - x) * t)).join(',')})`; };
+  function tempFarg(T) {
+    // 35 °C blå → 37 °C orange → 40 °C röd
+    if (T <= 37) return blanda('#4aa3ff', '#ffb347', klamp((T - 35) / 2, 0, 1));
+    return blanda('#ffb347', '#ff3030', klamp((T - 37) / 3, 0, 1));
+  }
+  function hudFarg(v) {
+    return v < PARAM.vNeutral ? blanda(F['hud-lag'], F['hud-mitt'], v / PARAM.vNeutral)
+                              : blanda(F['hud-mitt'], F['hud-hog'], (v - PARAM.vNeutral) / (1 - PARAM.vNeutral));
+  }
+  function himmel(Ta) {
+    const kall = F.ljust ? '#cfe5fb' : '#0d2238', mild = F.ljust ? '#e9f1f6' : '#0f1a26', het = F.ljust ? '#fde2bf' : '#2b1a10';
+    return Ta < 18 ? blanda(kall, mild, klamp((Ta + 15) / 33, 0, 1)) : blanda(mild, het, klamp((Ta - 18) / 27, 0, 1));
+  }
+
+  // =====================================================================
+  // Scenen
+  // =====================================================================
+  const S = $('scen-svg');
+  const defs = el('defs', {}, S);
+  const gradK = el('radialGradient', { id: 'kärnglod' }, defs);
+  const stopK1 = el('stop', { offset: '0%', 'stop-opacity': '0.95' }, gradK);
+  const stopK2 = el('stop', { offset: '100%', 'stop-opacity': '0' }, gradK);
+  const gradH = el('radialGradient', { id: 'hypoglod' }, defs);
+  el('stop', { offset: '0%', 'stop-color': '#fff', 'stop-opacity': '1' }, gradH);
+  const stopH = el('stop', { offset: '45%', 'stop-opacity': '0.9' }, gradH);
+  el('stop', { offset: '100%', 'stop-opacity': '0' }, gradH);
+  const gradSol = el('radialGradient', { id: 'solglod' }, defs);
+  el('stop', { offset: '0%', 'stop-color': '#ffe27a', 'stop-opacity': '1' }, gradSol);
+  el('stop', { offset: '55%', 'stop-color': '#ffb238', 'stop-opacity': '.55' }, gradSol);
+  el('stop', { offset: '100%', 'stop-color': '#ff9d00', 'stop-opacity': '0' }, gradSol);
+  const filt = el('filter', { id: 'mjuk', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+  el('feGaussianBlur', { stdDeviation: '2.2' }, filt);
+
+  const bakgrund = el('rect', { x: -600, y: -300, width: 1800, height: 1160 }, S);
+  const mark = el('path', { d: 'M-600 520 L0 515 Q300 498 600 515 L1200 520 L1200 860 L-600 860 Z' }, S);
+
+  // sol
+  const sol = el('g', { transform: 'translate(520 70)' }, S);
+  el('circle', { r: 70, fill: 'url(#solglod)' }, sol);
+  el('circle', { r: 24, fill: '#ffd24a' }, sol);
+  const solstralar = el('g', {}, sol);
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6;
+    el('line', { x1: Math.cos(a) * 32, y1: Math.sin(a) * 32, x2: Math.cos(a) * 46, y2: Math.sin(a) * 46, stroke: '#ffc93c', 'stroke-width': 3, 'stroke-linecap': 'round' }, solstralar);
+  }
+  // snö
+  const snoLager = el('g', {}, S);
+  const sno = Array.from({ length: 90 }, (_, i) => ({ x: -300 + Math.random() * 1200, y: Math.random() * 520, r: 1.2 + Math.random() * 2.2, vx: (Math.random() - 0.5) * 12, vy: 18 + Math.random() * 26, n: el('circle', { fill: '#fff', opacity: 0 }, snoLager) }));
+
+  // omgivningens temperatur
+  const omgText = el('text', { x: 20, y: 34, 'font-size': 22, 'font-weight': 700 }, S);
+  el('text', { x: 20, y: 52, class: 'etikett-t', 'font-size': 12 }, S).textContent = 'i omgivningen';
+
+  // värmeflöden runt kroppen
+  const varmeLager = el('g', {}, S);
+  const vagPos = [[205, 175, -1], [395, 175, 1], [180, 300, -1], [420, 300, 1], [225, 430, -1], [375, 430, 1]];
+  const vagor = vagPos.map(([x, y, sida]) => {
+    const g = el('g', { transform: `translate(${x} ${y})` }, varmeLager);
+    const p = el('path', { fill: 'none', 'stroke-width': 3, 'stroke-linecap': 'round' }, g);
+    const h = el('path', { 'stroke-linejoin': 'round' }, g);
+    return { g, p, h, sida, fas: Math.random() * 6 };
+  });
+
+  // kroppen
+  const kroppFlytt = el('g', {}, S);
+  const kropp = el('g', {}, kroppFlytt);
+  const hudDelar = [];
+  const lem = (d, b) => { const p = el('path', { d, fill: 'none', 'stroke-width': b, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, kropp); hudDelar.push(['stroke', p]); return p; };
+  lem('M238 192 Q214 262 206 344', 34);                 // vänster arm
+  lem('M362 192 Q386 262 394 344', 34);                 // höger arm
+  lem('M276 352 L266 508', 44);                         // vänster ben
+  lem('M324 352 L334 508', 44);                         // höger ben
+  const hals = el('rect', { x: 286, y: 140, width: 28, height: 36, rx: 8 }, kropp); hudDelar.push(['fill', hals]);
+  const balk = el('path', { d: 'M236 196 Q236 176 262 172 L338 172 Q364 176 364 196 L356 330 Q352 368 300 370 Q248 368 244 330 Z' }, kropp); hudDelar.push(['fill', balk]);
+  const huvud = el('ellipse', { cx: 300, cy: 104, rx: 42, ry: 48 }, kropp); hudDelar.push(['fill', huvud]);
+  // händer och fötter
+  for (const [cx, cy] of [[205, 352], [395, 352]]) { const c = el('circle', { cx, cy, r: 17 }, kropp); hudDelar.push(['fill', c]); }
+  const skor = [el('ellipse', { cx: 262, cy: 518, rx: 30, ry: 11 }, kropp), el('ellipse', { cx: 338, cy: 518, rx: 30, ry: 11 }, kropp)];
+
+  // kläder
+  const kladLager = el('g', {}, kropp);
+  const byxa = [el('path', { fill: 'none', 'stroke-linecap': 'round' }, kladLager), el('path', { fill: 'none', 'stroke-linecap': 'round' }, kladLager)];
+  const troja = el('path', {}, kladLager);
+  const armar = [el('path', { fill: 'none', 'stroke-linecap': 'round', 'stroke-width': 38 }, kladLager), el('path', { fill: 'none', 'stroke-linecap': 'round', 'stroke-width': 38 }, kladLager)];
+  const mossa = el('path', { d: 'M256 92 Q258 50 300 50 Q342 50 344 92 Z' }, kladLager);
+  const mossTofs = el('circle', { cx: 300, cy: 50, r: 9 }, kladLager);
+
+  function ritaKlader() {
+    const k = inst.klader;
+    const byxFarg = F.byxor, trojFarg = k === 'varma' ? F.jacka : F.trojja;
+    const benSlut = k === 'tunna' ? 418 : 500;
+    byxa[0].setAttribute('d', `M276 352 L${276 - 10 * (benSlut - 352) / 156} ${benSlut}`);
+    byxa[1].setAttribute('d', `M324 352 L${324 + 10 * (benSlut - 352) / 156} ${benSlut}`);
+    byxa.forEach(b => { b.setAttribute('stroke', byxFarg); b.setAttribute('stroke-width', k === 'tunna' ? 48 : 47); });
+    troja.setAttribute('d', 'M234 196 Q234 174 262 170 L338 170 Q366 174 366 196 L358 334 Q352 360 300 362 Q248 360 242 334 Z');
+    troja.setAttribute('fill', trojFarg);
+    const armSlut = k === 'tunna' ? 0.28 : k === 'vanliga' ? 0.62 : 0.97;
+    const arm = (sx, sy, cx, cy, ex, ey) => {
+      // del av en kvadratisk bezier fram till armSlut
+      const t = armSlut, x1 = sx + (cx - sx) * t, y1 = sy + (cy - sy) * t;
+      const x2 = cx + (ex - cx) * t, y2 = cy + (ey - cy) * t;
+      return `M${sx} ${sy} Q${x1} ${y1} ${x1 + (x2 - x1) * t} ${y1 + (y2 - y1) * t}`;
+    };
+    armar[0].setAttribute('d', arm(238, 192, 214, 262, 206, 344));
+    armar[1].setAttribute('d', arm(362, 192, 386, 262, 394, 344));
+    armar.forEach(a => a.setAttribute('stroke', trojFarg));
+    mossa.style.display = mossTofs.style.display = k === 'varma' ? '' : 'none';
+    mossa.setAttribute('fill', F.jacka); mossTofs.setAttribute('fill', F.ljust ? '#f3e9ee' : '#e9d7e0');
+    skor.forEach(s => s.setAttribute('fill', F.ljust ? '#3a3a3a' : '#0b1118'));
+  }
+
+  // kärnans glöd och hypotalamus
+  const karna = el('ellipse', { cx: 300, cy: 262, rx: 58, ry: 82, fill: 'url(#kärnglod)' }, kroppFlytt);
+  const hypo = el('circle', { cx: 300, cy: 102, r: 17, fill: 'url(#hypoglod)' }, kroppFlytt);
+  el('circle', { cx: 300, cy: 102, r: 4.5, fill: '#fff' }, kroppFlytt);
+
+  // svettdroppar
+  const svettLager = el('g', {}, kroppFlytt);
+  const droppPlats = [[284, 72], [318, 76], [300, 64], [270, 98], [330, 102], [212, 252], [388, 252], [214, 300], [386, 300], [262, 200], [338, 200]];
+  const droppar = droppPlats.map((p, i) => ({ x0: p[0], y0: p[1], fas: i / droppPlats.length, n: el('path', { d: 'M0 -6 Q4 0 0 4 Q-4 0 0 -6 Z', opacity: 0 }, svettLager) }));
+  const anga = [[250, 140], [350, 140], [300, 30]].map(([x, y], i) => ({ x, y, fas: i / 3, n: el('path', { fill: 'none', 'stroke-width': 2.4, 'stroke-linecap': 'round', opacity: 0 }, svettLager) }));
+
+  // nervbanor
+  const nervLager = el('g', {}, S);
+  const nervBanor = {
+    in: 'M206 336 Q216 262 240 196 Q270 172 292 150 L298 116',          // från hudens receptorer i vänster hand
+    karl: 'M302 116 L308 150 Q330 172 360 196 Q384 262 392 330',         // till hudens blodkärl i höger arm
+    svett: 'M300 116 Q326 150 334 210 Q338 236 320 262',                  // till svettkörtlar på bålen
+    skak: 'M299 118 L299 330 Q300 360 318 380 Q328 410 330 446',          // via ryggmärgen till lårets muskler
+  };
+  const banor = {};
+  for (const k in nervBanor) {
+    const p = el('path', { d: nervBanor[k], class: 'nerv' }, nervLager);
+    banor[k] = { p, L: p.getTotalLength(), partiklar: [], tillAck: 0 };
+  }
+  const partikelLager = el('g', {}, S);
+
+  // etiketter
+  const etikettLager = el('g', {}, S);
+  function etikett(text, x, y, lx, ly, anchor = 'start') {
+    el('line', { x1: lx, y1: ly, x2: anchor === 'start' ? x - 4 : x + 4, y2: y - 4, class: 'ledare' }, etikettLager);
+    const t = el('text', { x, y, class: 'etikett-t', 'text-anchor': anchor }, etikettLager);
+    text.split('\n').forEach((rad, i) => { const ts = el('tspan', { x, dy: i ? 15 : 0 }, t); ts.textContent = rad; });
+    return t;
+  }
+  const et = {
+    hypo: etikett('Hypotalamus\n(termostaten)', 440, 96, 318, 102),
+    rec: etikett('Temperatur-\nreceptorer i huden', 30, 392, 198, 356),
+    karl: etikett('Blodkärl\ni huden', 470, 300, 398, 300),
+    svett: etikett('Svettkörtlar', 470, 222, 340, 214),
+    skak: etikett('Skelettmuskler', 470, 452, 352, 446),
+    karna: etikett('Kärnan', 30, 262, 244, 262),
+  };
+
+  // ---------- partiklar ----------
+  function uppdateraBana(b, takt, farg, dtv) {
+    b.tillAck += takt * dtv;
+    while (b.tillAck >= 1) {
+      b.tillAck -= 1;
+      b.partiklar.push({ s: 0, n: el('circle', { r: 4.2, filter: 'url(#mjuk)' }, partikelLager), k: el('circle', { r: 2.3 }, partikelLager) });
+    }
+    const v = 150; // px per verklig sekund
+    b.partiklar = b.partiklar.filter(q => {
+      q.s += v * dtv;
+      if (q.s > b.L) { q.n.remove(); q.k.remove(); return false; }
+      const pt = b.p.getPointAtLength(q.s);
+      for (const c of [q.n, q.k]) { c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y); }
+      q.n.setAttribute('fill', farg); q.k.setAttribute('fill', farg);
+      const kant = Math.min(1, q.s / 20, (b.L - q.s) / 20);
+      q.n.setAttribute('opacity', 0.55 * kant); q.k.setAttribute('opacity', kant);
+      return true;
+    });
+  }
+
+  // ---------- scen per bildruta ----------
+  let klocka = 0;
+  function ritaScen(dtv) {
+    klocka += dtv;
+    const e = Modell.signal(z, inst);
+    const f = Modell.floden(z, inst);
+    const Ts = Modell.hud(z.T, inst.omgivning, z.v, z.s);
+    const Ta = inst.omgivning;
+
+    bakgrund.setAttribute('fill', himmel(Ta));
+    mark.setAttribute('fill', Ta < 2 ? (F.ljust ? '#f4f8fb' : '#c9d9e6') : F.mark);
+    omgText.textContent = fmt(Ta, 0) + ' °C';
+    omgText.setAttribute('fill', Ta < 10 ? F.kall : Ta > 28 ? F.varm : F.text);
+
+    // sol och snö
+    const solStyrka = klamp((Ta - 24) / 12, 0, 1);
+    sol.setAttribute('opacity', solStyrka);
+    solstralar.setAttribute('transform', `rotate(${(klocka * 8) % 360})`);
+    const snoStyrka = klamp((3 - Ta) / 12, 0, 1);
+    sno.forEach((f2, i) => {
+      const synlig = i < sno.length * snoStyrka;
+      if (synlig && !minskadRorelse) { f2.y += f2.vy * dtv; f2.x += (f2.vx + Math.sin(klocka + i) * 8) * dtv; if (f2.y > 520) { f2.y = -5; f2.x = -300 + Math.random() * 1200; } }
+      f2.n.setAttribute('cx', f2.x); f2.n.setAttribute('cy', f2.y); f2.n.setAttribute('r', f2.r);
+      f2.n.setAttribute('opacity', synlig ? 0.85 : 0);
+    });
+
+    // hud och kläder
+    const hf = hudFarg(z.v);
+    hudDelar.forEach(([attr, n]) => n.setAttribute(attr, hf));
+    stopK1.setAttribute('stop-color', tempFarg(z.T)); stopK2.setAttribute('stop-color', tempFarg(z.T));
+    karna.setAttribute('opacity', 0.75);
+    const hypoFarg = e > 0.12 ? F.varm : e < -0.18 ? F.kall : F.accent;
+    stopH.setAttribute('stop-color', hypoFarg);
+    hypo.setAttribute('r', 15 + 3 * Math.sin(klocka * 4) * klamp(Math.abs(e) * 2, 0.15, 1));
+
+    // skakningar
+    const skak = minskadRorelse ? 0 : z.k * 3.2;
+    kroppFlytt.setAttribute('transform', skak > 0.05 ? `translate(${(Math.random() - 0.5) * skak} ${(Math.random() - 0.5) * skak * 0.5})` : '');
+
+    // svett
+    droppar.forEach((d, i) => {
+      const synlig = i < Math.ceil(z.s * droppar.length * 1.1) && z.s > 0.02;
+      if (!synlig) { d.n.setAttribute('opacity', 0); return; }
+      const fas = (klocka * 0.45 + d.fas) % 1;
+      d.n.setAttribute('transform', `translate(${d.x0} ${d.y0 + fas * 26})`);
+      d.n.setAttribute('fill', F.svett);
+      d.n.setAttribute('opacity', (1 - fas) * 0.95);
+    });
+    const angStyrka = klamp((z.s - 0.05) * 1.6, 0, 1);
+    anga.forEach(a => {
+      const fas = (klocka * 0.3 + a.fas) % 1;
+      const y = a.y - fas * 40;
+      a.n.setAttribute('d', `M${a.x} ${y} q-7 -8 0 -16 q7 -8 0 -16`);
+      a.n.setAttribute('stroke', F.svett);
+      a.n.setAttribute('opacity', angStyrka * Math.sin(fas * Math.PI) * 0.8);
+    });
+
+    // värmeflöden genom huden
+    const styrka = klamp(Math.abs(f.hud) / 160, 0, 1);
+    const ut = f.hud >= 0;
+    vagor.forEach((w, i) => {
+      w.fas += dtv * 2.2;
+      const off = ((w.fas % 1) * 16) * (ut ? 1 : -1);
+      const s = w.sida, x0 = s * (8 + off), x1 = s * (40 + off);
+      let d = `M${x0} 0`;
+      for (let j = 1; j <= 4; j++) d += ` Q${x0 + s * (j - 0.5) * 8} ${j % 2 ? -6 : 6} ${x0 + s * j * 8} 0`;
+      w.p.setAttribute('d', d);
+      const spets = ut ? x1 : x0 - s * 4;
+      const riktn = ut ? s : -s;
+      w.h.setAttribute('d', `M${spets} 0 l${-riktn * 8} -6 l0 12 Z`);
+      const farg = ut ? F.varm : '#f7c948';
+      w.p.setAttribute('stroke', farg); w.h.setAttribute('fill', farg);
+      w.g.setAttribute('opacity', (styrka < 0.06 ? 0 : 0.25 + 0.75 * styrka) * (i < 2 && inst.klader === 'varma' ? 0.6 : 1));
+    });
+
+    // nervsignaler
+    const sinneFarg = e > 0.05 ? F.varm : e < -0.05 ? F.kall : F['text-dim'];
+    uppdateraBana(banor.in, 1.2 + 6 * klamp(Math.abs(e), 0, 1), sinneFarg, dtv);
+    const vAvv = z.v - PARAM.vNeutral;
+    uppdateraBana(banor.karl, inst.blodkarl ? 8 * klamp(Math.abs(vAvv) * 1.6, 0, 1) : 0, vAvv >= 0 ? F.varm : F.kall, dtv);
+    uppdateraBana(banor.svett, 8 * z.s, F.varm, dtv);
+    uppdateraBana(banor.skak, 8 * z.k, F.kall, dtv);
+
+    et.hypo.classList.toggle('aktiv', Math.abs(e) > 0.12);
+    et.rec.classList.toggle('aktiv', Math.abs(e) > 0.12);
+    et.karl.classList.toggle('aktiv', Math.abs(vAvv) > 0.15);
+    et.svett.classList.toggle('aktiv', z.s > 0.05);
+    et.skak.classList.toggle('aktiv', z.k > 0.05);
+  }
+
+  // =====================================================================
+  // Återkopplingsslingan
+  // =====================================================================
+  const SL = $('slinga-svg');
+  const slDefs = el('defs', {}, SL);
+  const pilspets = el('marker', { id: 'pil', viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, slDefs);
+  const pilspetsP = el('path', { d: 'M0 0 L10 5 L0 10 Z' }, pilspets);
+  const noder = {};
+  const nodPos = { forandring: [147, 22], receptor: [236, 104], centrum: [147, 190], effektor: [58, 104] };
+  // förändring → receptorer → styrcentrum → effektorer → (svaret motverkar förändringen)
+  const pilar = [
+    el('path', { d: 'M214 30 Q238 40 240 80', class: 'slinga-pil', 'marker-end': 'url(#pil)' }, SL),
+    el('path', { d: 'M240 128 Q238 174 216 186', class: 'slinga-pil', 'marker-end': 'url(#pil)' }, SL),
+    el('path', { d: 'M78 186 Q56 174 54 128', class: 'slinga-pil', 'marker-end': 'url(#pil)' }, SL),
+    el('path', { d: 'M54 80 Q56 40 78 30', class: 'slinga-pil', 'marker-end': 'url(#pil)' }, SL),
+  ];
+  const minus = el('g', { transform: 'translate(52 50)' }, SL);
+  const minusC = el('circle', { r: 13 }, minus);
+  const minusT = el('text', { 'text-anchor': 'middle', y: 6, 'font-size': 19, 'font-weight': 700 }, minus);
+  minusT.textContent = '−';
+  const svarT1 = el('text', { x: 147, y: 62, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 600 }, SL);
+  const svarT2 = el('text', { x: 147, y: 77, 'text-anchor': 'middle', 'font-size': 11.5, class: 'etikett-t' }, SL);
+  const svarT3 = el('text', { x: 147, y: 150, 'text-anchor': 'middle', 'font-size': 10.5, class: 'etikett-t' }, SL);
+  svarT3.textContent = 'svaret motverkar förändringen';
+  for (const k in nodPos) {
+    const [cx, cy] = nodPos[k];
+    const g = el('g', { class: 'nod', transform: `translate(${cx} ${cy})` }, SL);
+    const w = k === 'forandring' || k === 'centrum' ? 134 : 116;
+    const r = el('rect', { x: -w / 2, y: -20, width: w, height: 40, rx: 7 }, g);
+    const t1 = el('text', { 'text-anchor': 'middle', y: -3 }, g);
+    const t2 = el('text', { 'text-anchor': 'middle', y: 12, class: 'etikett-t', 'font-size': 11 }, g);
+    noder[k] = { g, r, t1, t2 };
+  }
+  let senasteLage = null;
+  function ritaSlinga(lage) {
+    const l = lage === 'fara' ? (z.T >= 40 ? 'varm' : 'kall') : lage;
+    const farg = l === 'varm' ? F.varm : l === 'kall' ? F.kall : F.lugn;
+    const nyckel = l + (F.ljust ? 'L' : 'M');
+    if (nyckel === senasteLage) return;
+    senasteLage = nyckel;
+    const txt = TEXT.slinga[l];
+    for (const k in noder) {
+      noder[k].t1.textContent = txt[k][0];
+      noder[k].t2.textContent = txt[k][1];
+      noder[k].r.style.stroke = farg;
+      noder[k].r.style.fill = `color-mix(in srgb, ${farg} ${l === 'lugn' ? 6 : 12}%, ${F.bg3})`;
+    }
+    svarT1.textContent = txt.svar[0]; svarT2.textContent = txt.svar[1];
+    svarT1.style.fill = farg;
+    pilar.forEach(p => { p.style.stroke = farg; });
+    pilspetsP.setAttribute('fill', farg);
+    minusC.setAttribute('fill', farg); minusT.setAttribute('fill', F.bg);
+  }
+
+  // =====================================================================
+  // Avläsningar
+  // =====================================================================
+  function ritaAvlasning() {
+    const lage = Modell.lage(z, inst);
+    const f = Modell.floden(z, inst);
+    const Ts = Modell.hud(z.T, inst.omgivning, z.v, z.s);
+    const sp = Modell.borvarde(inst);
+    $('kärna-varde').innerHTML = fmt(z.T, 1) + '<small> °C</small>';
+    $('kärna-varde').style.color = z.T >= 40 || z.T < 35 ? F.fara : Math.abs(z.T - sp) < 0.25 ? F.text : z.T > sp ? F.varm : F.kall;
+    $('borvarde-varde').textContent = fmt(sp, 1) + ' °C';
+    $('hud-varde').textContent = fmt(Ts, 0) + ' °C';
+    const st = $('status');
+    let text, klass;
+    if (z.T >= 40) { text = z.T >= 42 ? 'Livsfarlig överhettning' : 'Överhettning (hypertermi)'; klass = 'fara'; }
+    else if (z.T < 35) { text = 'Nedkylning (hypotermi)'; klass = 'fara'; }
+    else if (lage === 'varm') { text = 'För varmt: kroppen kyler sig'; klass = 'varm'; }
+    else if (lage === 'kall') { text = inst.feber && z.T < sp ? 'Under börvärdet: frossa' : 'För kallt: kroppen värmer sig'; klass = 'kall'; }
+    else { text = 'Nära börvärdet'; klass = 'lugn'; }
+    if (st.textContent !== text) st.textContent = text;
+    st.className = 'status ' + klass;
+    ritaSlinga(lage);
+
+    // effektorer
+    const karl = $('stapel-karl');
+    karl.classList.toggle('ur-funktion', !inst.blodkarl);
+    const m = karl.querySelector('.markor');
+    m.style.left = (z.v * 100) + '%';
+    m.style.background = z.v >= PARAM.vNeutral ? hudFarg(z.v) : hudFarg(z.v);
+    m.style.boxShadow = `0 0 0 2px ${F.bg2}`;
+    m.style.display = inst.blodkarl ? '' : 'none';
+    const sv = $('stapel-svett'); sv.classList.toggle('ur-funktion', !inst.svett);
+    sv.querySelector('.fyll').style.width = (z.s * 100) + '%';
+    const sk = $('stapel-skak'); sk.classList.toggle('ur-funktion', !inst.skak);
+    sk.querySelector('.fyll').style.width = (z.k * 100) + '%';
+
+    // värmebalans, skala 0–1000 W
+    const W = 1000, p = x => klamp(x / W * 100, 0, 100) + '%';
+    const inDelar = [[f.amne, F.mat], [f.skak, F.kall], [Math.max(0, -f.hud), '#f7c948']];
+    const utDelar = [[Math.max(0, f.hud), F.varm], [f.avdunst, F.svett]];
+    const fyll = (id, delar) => {
+      const c = $(id);
+      while (c.children.length < delar.length) c.appendChild(document.createElement('div'));
+      delar.forEach(([v, farg], i) => { c.children[i].style.width = p(v); c.children[i].style.background = farg; });
+    };
+    fyll('balans-in', inDelar); fyll('balans-ut', utDelar);
+    const vin = inDelar.reduce((a, b) => a + b[0], 0), vut = utDelar.reduce((a, b) => a + b[0], 0);
+    const bt = Math.abs(vin - vut) < 25 ? 'In och ut ungefär lika: temperaturen står still.'
+      : vin > vut ? 'Mer värme in än ut: temperaturen stiger.' : 'Mer värme ut än in: temperaturen sjunker.';
+    if ($('balans-text').textContent !== bt) $('balans-text').textContent = bt;
+
+    const min = Math.floor(z.t / 60);
+    $('tid-rad').textContent = `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`;
+  }
+
+  // =====================================================================
+  // Diagrammet
+  // =====================================================================
+  const G = $('graf-svg');
+  const FONSTER = 7200; // s
+  function ritaGraf() {
+    const r = G.getBoundingClientRect();
+    const W = Math.max(200, r.width), H = Math.max(80, r.height);
+    G.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    G.innerHTML = '';
+    const vm = 30, hm = 22, om = 6, um = 18;
+    const t1 = Math.max(FONSTER, z.t), t0 = t1 - FONSTER;
+    const ymin = 33, ymax = 43;
+    const X = t => vm + (t - t0) / FONSTER * (W - vm - hm);
+    const Y = T => om + (ymax - klamp(T, ymin, ymax)) / (ymax - ymin) * (H - om - um);
+    // zoner
+    el('rect', { x: vm, y: Y(43), width: W - vm - hm, height: Y(40) - Y(43), fill: F.fara, opacity: 0.12 }, G);
+    el('rect', { x: vm, y: Y(35), width: W - vm - hm, height: Y(33) - Y(35), fill: F.kall, opacity: 0.14 }, G);
+    el('rect', { x: vm, y: Y(37.5), width: W - vm - hm, height: Y(36.5) - Y(37.5), fill: F.lugn, opacity: 0.12 }, G);
+    const steg = H < 170 ? 2 : 1;
+    for (let T = 34; T <= 42; T += steg) {
+      el('line', { x1: vm, x2: W - hm, y1: Y(T), y2: Y(T), stroke: F.border, 'stroke-width': 1, opacity: 0.6 }, G);
+      const t = el('text', { x: vm - 6, y: Y(T) + 4, 'text-anchor': 'end', 'font-size': 11, class: 'etikett-t' }, G); t.textContent = T;
+    }
+    // tidsaxel
+    for (let m = Math.ceil(t0 / 1800) * 1800; m <= t1; m += 1800) {
+      const t = el('text', { x: X(m), y: H - 4, 'text-anchor': 'middle', 'font-size': 10.5, class: 'etikett-t' }, G);
+      t.textContent = `${Math.floor(m / 3600)}:${String((m / 60) % 60).padStart(2, '0')}`;
+    }
+    // händelser
+    handelser.filter(h => h.t >= t0).forEach(h => {
+      el('line', { x1: X(h.t), x2: X(h.t), y1: om, y2: H - um, stroke: F['text-dim'], 'stroke-dasharray': '3 3', opacity: 0.7 }, G);
+      const t = el('text', { x: X(h.t) + 4, y: om + 10, 'font-size': 10.5, class: 'etikett-t' }, G); t.textContent = h.namn;
+    });
+    // börvärde
+    const synliga = historik.filter(h => h.t >= t0);
+    if (synliga.length > 1) {
+      let d = '';
+      synliga.forEach((h, i) => { d += (i ? ' L' : 'M') + X(h.t).toFixed(1) + ' ' + Y(h.sp).toFixed(1); });
+      el('path', { d, fill: 'none', stroke: F['text-dim'], 'stroke-width': 1.5, 'stroke-dasharray': '6 4' }, G);
+      // kurvan, färgad efter temperatur
+      for (let i = 1; i < synliga.length; i++) {
+        const a = synliga[i - 1], b = synliga[i];
+        el('line', { x1: X(a.t), y1: Y(a.T), x2: X(b.t), y2: Y(b.T), stroke: tempFarg((a.T + b.T) / 2), 'stroke-width': 3, 'stroke-linecap': 'round' }, G);
+      }
+      const sista = synliga[synliga.length - 1];
+      el('circle', { cx: X(sista.t), cy: Y(sista.T), r: 4.5, fill: tempFarg(sista.T), stroke: F.bg2, 'stroke-width': 2 }, G);
+    }
+    $('graf-not').textContent = 'streckat: börvärdet';
+  }
+
+  // =====================================================================
+  // Reglage
+  // =====================================================================
+  function logga(namn) {
+    // samla ändringar som görs inom en halv modellminut till en markering
+    const sista = handelser[handelser.length - 1];
+    if (sista && z.t - sista.t < 30) sista.namn = namn; else handelser.push({ t: z.t, namn });
+  }
+  function synkaReglage() {
+    $('omgivning').value = inst.omgivning;
+    $('omgivning-varde').textContent = fmt(inst.omgivning, 0) + ' °C';
+    for (const [id, k] of [['aktivitet', 'aktivitet'], ['klader', 'klader']])
+      $(id).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.varde === inst[k])));
+    $('feber').checked = inst.feber;
+    $('eff-blodkarl').checked = inst.blodkarl; $('eff-svett').checked = inst.svett; $('eff-skak').checked = inst.skak;
+    ritaKlader();
+  }
+  $('omgivning').addEventListener('input', e => {
+    inst.omgivning = +e.target.value;
+    $('omgivning-varde').textContent = fmt(inst.omgivning, 0) + ' °C';
+  });
+  $('omgivning').addEventListener('change', () => logga(fmt(inst.omgivning, 0) + ' °C'));
+  for (const id of ['aktivitet', 'klader']) {
+    $(id).addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      inst[id] = b.dataset.varde; synkaReglage();
+      logga(id === 'aktivitet' ? TEXT.akt[inst.aktivitet] : TEXT.klader[inst.klader]);
+    });
+  }
+  $('feber').addEventListener('change', e => { inst.feber = e.target.checked; logga(inst.feber ? 'feber' : 'feber över'); });
+  for (const [id, k, namn] of [['eff-blodkarl', 'blodkarl', 'blodkärl'], ['eff-svett', 'svett', 'svett'], ['eff-skak', 'skak', 'skakningar']])
+    $(id).addEventListener('change', e => { inst[k] = e.target.checked; logga(namn + (inst[k] ? ' på' : ' av')); });
+
+  SNABBVAL.forEach(sv => {
+    const b = document.createElement('button');
+    b.className = 'knapp'; b.type = 'button'; b.textContent = sv.namn;
+    b.addEventListener('click', () => { inst = { ...sv.inst }; synkaReglage(); logga(sv.namn.toLowerCase()); if (!spelar) vaxlaSpel(); });
+    $('snabbval').appendChild(b);
+  });
+
+  function vaxlaSpel() {
+    spelar = !spelar;
+    $('spela-knapp').textContent = spelar ? '❚❚ Paus' : '▶ Spela';
+  }
+  $('spela-knapp').addEventListener('click', vaxlaSpel);
+  $('borja-om').addEventListener('click', () => {
+    inst = Modell.standardInstallning();
+    z = Modell.kor(Modell.nyttTillstand(), inst, 1800); z.t = 0;
+    historik = [{ t: 0, T: z.T, sp: Modell.borvarde(inst) }]; handelser = [];
+    synkaReglage(); ritaGraf();
+    if (!spelar) vaxlaSpel();
+  });
+  $('fart').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    fart = +b.dataset.fart;
+    $('fart').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  });
+
+  // =====================================================================
+  // Huvudslinga
+  // =====================================================================
+  let forra = performance.now(), grafAck = 0;
+  function ruta(nu) {
+    const dtv = Math.min(0.1, (nu - forra) / 1000); forra = nu;
+    if (spelar) {
+      ackumulerat += dtv * fart;
+      while (ackumulerat >= 5) { z = Modell.steg(z, inst, 5); ackumulerat -= 5; }
+      const sista = historik[historik.length - 1];
+      if (z.t - sista.t >= 20) {
+        historik.push({ t: z.t, T: z.T, sp: Modell.borvarde(inst) });
+        if (historik.length > 2000) historik.splice(0, historik.length - 1500);
+      }
+    }
+    ritaScen(spelar ? dtv : dtv * 0.35);
+    ritaAvlasning();
+    grafAck += dtv;
+    if (grafAck > 0.25) { grafAck = 0; ritaGraf(); }
+    requestAnimationFrame(ruta);
+  }
+  synkaReglage();
+  ritaAvlasning();
+  ritaGraf();
+  new ResizeObserver(() => ritaGraf()).observe(G);
+  requestAnimationFrame(ruta);
+}
+</script>
+</body>
+</html>
