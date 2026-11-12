@@ -36,6 +36,10 @@ I byggläget bygger eleven kretsen själv av färdiga delar (blodsocker och krop
 
 I fritt bygge bygger eleven på en tom duk med egna storheter, källor, förluster, ventiler, sensorer och signaler, drar rören själv, lägger in störningar och läser en rapport om vad som hände. Det går också att börja från en färdig krets (blodsocker eller temperatur) och ta sönder eller bygga ut den.
 
+## Pulsslingan
+
+Regleringen av pulsen, uppbyggd en del i taget: musklerna och hjärtat, sensorerna, förlängda märgen och nerverna till hjärtat (sympatikus som gas, parasympatikus som broms). Det finns ett enda reglage, musklernas arbete. Innan slingan är sluten ger arbete en syrebrist som ingen gör något åt; när den är sluten stiger pulsen tills syret räcker och faller tillbaka i vila. Appen är gjord för att förstås snabbt: lite text, få delar på skärmen åt gången och ett tidigare steg som sätt att bryta slingan.
+
 ## Kroppens termostat
 
 En demo av homeostas för genomgången i helklass: en människa i en omgivning från −15 till 45 °C, med reglage för aktivitet, kläder och feber. Hypotalamus jämför temperaturen med börvärdet och styr via sensoriska och motoriska nervceller målorganen: hudens blodkärl, svettkörtlarna och skelettmusklerna. Nervsignaler, hudfärg, svett och värmeflöden syns i bilden, och bredvid visas den negativa återkopplingsslingan, värmebalansen och temperaturkurvan. Målorganen kan slås av för att visa vad som händer när återkopplingen bryts.
@@ -64,6 +68,7 @@ bindningsverkstan/index.html  Bindningsverkstan
 reaktioner/index.html         Kemiska reaktioner och energi
 reglerverkstan/index.html     Reglerverkstan
 kroppstemperatur/index.html   Kroppens termostat
+puls/index.html               Pulsslingan
 ```
 
 ## Licens
