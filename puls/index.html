@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<!-- © 2026 Christian Broselid. All rights reserved. -->
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulsslingan 0.1</title>
+<meta name="description" content="Bygg upp regleringen av pulsen en del i taget och se hur kroppen kompenserar när musklerna arbetar.">
+<script id="tema-start">
+  // Tema före första ritningen, så att sidan inte blinkar till i fel tema.
+  // Ett sparat val (temaknappen) gäller i alla apparna på webbplatsen;
+  // utan sparat val följer appen datorns inställning.
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('kemiappar-tema'); } catch (e) {}
+    if (t !== 'ljust' && t !== 'morkt') t = matchMedia('(prefers-color-scheme: light)').matches ? 'ljust' : 'morkt';
+    document.documentElement.dataset.tema = t;
+  })();
+</script>
+<style>
+  /* Fyra färger bär betydelse, och bara de: blod/syre, sensorisk signal, gas och broms. */
+  :root {
+    --bg:        #0b1016;
+    --bg2:       #121a23;
+    --bg3:       #1a2531;
+    --border:    #2a3b4b;
+    --text:      #dde7ee;
+    --text-dim:  #8fa4b4;
+    --accent:    #4cc2ff;
+    --pa-accent: #06202e;
+    --blod:      #ff6b6b;
+    --nerv:      #4fd1b5;
+    --gas:       #ffa94d;
+    --broms:     #7fb0ff;
+    --font-ui:   system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color-scheme: dark;
+  }
+  :root[data-tema="ljust"] {
+    --bg:        #f2f5f8;
+    --bg2:       #ffffff;
+    --bg3:       #e8eef3;
+    --border:    #cbd6df;
+    --text:      #17232d;
+    --text-dim:  #556a7a;
+    --accent:    #0072a3;
+    --pa-accent: #ffffff;
+    --blod:      #d63b3b;
+    --nerv:      #0c8a72;
+    --gas:       #c2620a;
+    --broms:     #2563c9;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font-ui);
+    font-size: 16px; line-height: 1.5; height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column;
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  header {
+    display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap;
+    padding-block: 7px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 17px; font-weight: 600; }
+  .hem-lank { color: var(--text-dim); text-decoration: none; font-size: 13px; white-space: nowrap; }
+  .hem-lank:hover { color: var(--accent); }
+  .luft { flex: 1; }
+  .knapp, .tema-knapp {
+    background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 11px; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap;
+  }
+  .knapp:hover, .tema-knapp:hover { border-color: var(--accent); }
+  .knapp.primar {
+    background: var(--accent); color: var(--pa-accent); border-color: var(--accent);
+    font-weight: 600; font-size: 16px; padding: 10px 16px; width: 100%;
+  }
+  .knapp.primar:hover { filter: brightness(1.08); }
+  .tema-knapp { padding: 5px 8px; display: flex; }
+  .tema-knapp svg { width: 18px; height: 18px; }
+  :root[data-tema="ljust"] .ikon-sol, :root:not([data-tema="ljust"]) .ikon-mane { display: none; }
+
+  main {
+    flex: 1; min-height: 0; display: grid; gap: 12px;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    padding-block: 12px; padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
+  }
+  .panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; }
+
+  /* ---------- Bilden och reglaget ---------- */
+  .bild { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #scen { flex: 1; min-height: 0; width: 100%; display: block; }
+  .reglage {
+    border-top: 1px solid var(--border); padding: 12px 20px 14px;
+    display: grid; grid-template-columns: auto minmax(0, 460px); gap: 4px 18px;
+    align-items: center; justify-content: center;
+  }
+  .reglage label { font-weight: 600; font-size: 16px; }
+  .skala { grid-column: 2; display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 10px; border-radius: 5px;
+    background: linear-gradient(to right, var(--blod) var(--p, 0%), var(--bg3) var(--p, 0%));
+    border: 1px solid var(--border);
+  }
+  input[type=range]::-moz-range-track { height: 10px; border-radius: 5px; background: var(--bg3); border: 1px solid var(--border); }
+  input[type=range]::-moz-range-progress { height: 10px; border-radius: 5px; background: var(--blod); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%; margin-top: -10px;
+    background: var(--bg2); border: 3px solid var(--blod); box-shadow: 0 1px 4px rgba(0,0,0,.35);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--bg2); border: 3px solid var(--blod); box-shadow: 0 1px 4px rgba(0,0,0,.35);
+  }
+
+  /* ---------- Bilden (svg) ---------- */
+  #scen text { fill: var(--text); font-family: var(--font-ui); }
+  #scen .dim { fill: var(--text-dim); }
+  .kort { fill: var(--bg3); stroke: var(--border); stroke-width: 1.5; }
+  .rubrik { font-size: 21px; font-weight: 650; }
+  .roll { font-size: 15px; }
+  .vag { fill: none; stroke-linecap: round; }
+  .etikett { font-size: 15px; }
+  .f-blod { fill: var(--blod); } .s-blod { stroke: var(--blod); }
+  .f-nerv { fill: var(--nerv); } .s-nerv { stroke: var(--nerv); }
+  .f-gas { fill: var(--gas); }   .s-gas { stroke: var(--gas); }
+  .f-broms { fill: var(--broms); } .s-broms { stroke: var(--broms); }
+  .f-dim { fill: var(--text-dim); } .s-dim { stroke: var(--text-dim); }
+  #scen text.f-gas { fill: var(--gas); } #scen text.f-broms { fill: var(--broms); }
+  #scen text.f-nerv { fill: var(--nerv); } #scen text.f-blod { fill: var(--blod); }
+
+  /* En del syns från och med sitt steg. Nästa del visas som en streckad plats. */
+  [data-fran] { opacity: 0; visibility: hidden; transition: opacity .5s; }
+  [data-fran].syns { opacity: 1; visibility: visible; }
+  .plats { opacity: 0; visibility: hidden; cursor: pointer; transition: opacity .4s; }
+  .plats.syns { opacity: 1; visibility: visible; }
+  .plats rect, .plats path { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-dasharray: 6 6; }
+  .plats text { fill: var(--text-dim) !important; font-size: 17px; }
+  .plats:hover rect, .plats:hover path { stroke: var(--accent); }
+  .plats:hover text { fill: var(--accent) !important; }
+
+  #kort-sensor .kort { transition: stroke .3s; }
+  #kort-sensor.aktiv .kort, #kort-marg.aktiv .kort { stroke: var(--nerv); stroke-width: 2.5; }
+  #puls-tal { font-size: 46px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #lage1 { font-size: 23px; font-weight: 650; }
+  #lage2 { font-size: 19px; }
+  .stapel-bak { fill: var(--bg2); stroke: var(--border); }
+  #brist { fill: none; stroke: var(--blod); stroke-width: 1.5; stroke-dasharray: 4 3; }
+
+  /* ---------- Stegen ---------- */
+  .sida { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
+  .steg { list-style: none; padding: 8px; }
+  .steg li { border-radius: 10px; }
+  .steg li.nu { background: var(--bg3); }
+  .steg-rubrik {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: none; border: 0; color: var(--text-dim); font: inherit; font-size: 15px;
+    padding: 8px 10px; border-radius: 10px; cursor: pointer;
+  }
+  .steg-rubrik:hover { color: var(--text); }
+  .steg-rubrik .nr {
+    flex: none; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--border);
+    display: grid; place-items: center; font-size: 14px; font-weight: 600;
+  }
+  li.klar .steg-rubrik { color: var(--text); }
+  li.klar .nr { background: var(--bg3); border-color: var(--text-dim); }
+  li.nu .steg-rubrik { color: var(--text); font-weight: 650; font-size: 18px; cursor: default; }
+  li.nu .nr { background: var(--accent); border-color: var(--accent); color: var(--pa-accent); }
+  .steg-text { display: none; padding: 2px 12px 14px 46px; }
+  li.nu .steg-text { display: block; }
+  .steg-text p { margin-bottom: 10px; }
+  .steg-text .prova { border-left: 3px solid var(--accent); padding-left: 10px; font-weight: 600; margin-bottom: 14px; }
+  .steg-text .prova:last-child, .steg-text p:last-child { margin-bottom: 0; }
+  .ord-gas { color: var(--gas); font-weight: 600; } .ord-broms { color: var(--broms); font-weight: 600; }
+
+  .kurva { padding: 12px 14px 8px; margin-top: auto; }
+  .kurva h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  #graf { width: 100%; height: auto; display: block; }
+  #graf text { fill: var(--text-dim); font-size: 11px; font-family: var(--font-ui); }
+  #graf .rutnat { stroke: var(--border); stroke-width: 1; }
+  #graf-puls { fill: none; stroke: var(--blod); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  #graf-arbete { fill: var(--text-dim); opacity: .35; }
+
+  dialog {
+    margin: auto; max-width: min(560px, calc(100vw - 32px)); background: var(--bg2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 14px; padding: 22px 24px;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  dialog h2 { font-size: 19px; margin-bottom: 10px; }
+  dialog ul { padding-left: 20px; margin-bottom: 16px; }
+  dialog li { margin-bottom: 7px; }
+
+  /* Låga skärmar (projektor i 1280×720): tätare steglista, så att kurvan ryms utan rullning. */
+  @media (max-height: 760px) and (min-width: 901px) {
+    .sida { font-size: 15px; gap: 10px; }
+    .steg { padding: 6px; }
+    .steg-rubrik { padding: 4px 10px; }
+    li.nu .steg-rubrik { font-size: 17px; }
+    .steg-text { padding-bottom: 10px; }
+    .steg-text p { margin-bottom: 7px; }
+    .kurva { padding: 8px 14px 4px; }
+  }
+  @media (max-width: 900px) {
+    body { height: auto; min-height: 100vh; }
+    main { grid-template-columns: minmax(0, 1fr); }
+    #scen { aspect-ratio: 960 / 560; flex: none; }
+    .reglage { grid-template-columns: minmax(0, 1fr); }
+    .skala { grid-column: 1; }
+    .sida { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="hem-lank" href="../biologi/" title="Alla biologiappar">← Biologiappar</a>
+  <h1>Pulsslingan</h1>
+  <span class="luft"></span>
+  <button class="knapp" id="om-knapp" type="button">Om modellen</button>
+  <button class="tema-knapp" id="tema-knapp" type="button" aria-label="Byt tema" title="Byt tema">
+    <svg class="ikon-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="ikon-mane" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z" fill="currentColor"/></svg>
+  </button>
+</header>
+
+<main>
+  <section class="panel bild" aria-label="Regleringen av pulsen">
+    <svg id="scen" viewBox="0 0 960 560" role="img" aria-labelledby="scen-titel">
+      <title id="scen-titel">Slingan som reglerar pulsen: musklerna, sensorer, förlängda märgen och hjärtat</title>
+      <defs>
+        <marker id="pil-blod" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" class="f-blod"/></marker>
+        <marker id="pil-nerv" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" class="f-nerv"/></marker>
+        <marker id="pil-gas" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" class="f-gas"/></marker>
+        <marker id="pil-broms" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" class="f-broms"/></marker>
+        <marker id="pil-dim" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="f-dim"/></marker>
+      </defs>
+
+      <!-- Vägarna ritas först, så att korten ligger ovanpå ändarna. -->
+      <g id="vag-blod">
+        <path id="p-blod" class="vag s-blod" d="M800 343 Q800 472 652 472" stroke-width="9" opacity=".3" marker-end="url(#pil-blod)"/>
+        <text class="etikett f-blod" x="814" y="424">blod med syre</text>
+      </g>
+      <g data-fran="2">
+        <path class="vag s-dim" d="M320 472 Q165 472 165 330" stroke-width="2" stroke-dasharray="2 7" marker-end="url(#pil-dim)"/>
+        <path id="p-sens" class="vag s-nerv" d="M165 228 Q165 74 342 74" stroke-width="3" marker-end="url(#pil-nerv)"/>
+        <text class="etikett f-nerv" x="212" y="172">nervsignal</text>
+      </g>
+      <g data-fran="4">
+        <path id="p-gas" class="vag s-gas" d="M610 56 Q830 56 830 197" stroke-width="3" marker-end="url(#pil-gas)"/>
+        <path id="p-broms" class="vag s-broms" d="M610 92 Q770 92 770 197" stroke-width="3" marker-end="url(#pil-broms)"/>
+        <text class="etikett f-gas" x="844" y="128">sympatikus</text>
+        <text class="etikett f-gas" x="844" y="147" font-weight="700">gas</text>
+        <text class="etikett f-broms" x="756" y="150" text-anchor="end">parasympatikus</text>
+        <text class="etikett f-broms" x="756" y="169" text-anchor="end" font-weight="700">broms</text>
+      </g>
+      <g id="prickar"></g>
+
+      <!-- Musklerna -->
+      <g id="kort-muskel">
+        <rect class="kort" x="320" y="402" width="320" height="140" rx="16"/>
+        <g transform="translate(340 416)" aria-hidden="true">
+          <path d="M1 14C7 3 23 3 29 14C23 25 7 25 1 14z" class="f-blod" opacity=".85"/>
+          <path d="M8 9.5v9M15 7.5v13M22 9.5v9" stroke="var(--bg3)" stroke-width="1.6"/>
+        </g>
+        <text class="rubrik" x="380" y="437">Musklerna</text>
+        <text class="roll dim" x="342" y="478">Behöver syre</text>
+        <rect class="stapel-bak" x="450" y="465" width="172" height="16" rx="4"/>
+        <rect id="stapel-behov" class="f-dim" x="450" y="465" width="66" height="16" rx="4"/>
+        <text class="roll dim" x="342" y="512">Får syre</text>
+        <rect class="stapel-bak" x="450" y="499" width="172" height="16" rx="4"/>
+        <rect id="stapel-far" class="f-blod" x="450" y="499" width="66" height="16" rx="4"/>
+        <rect id="brist" x="516" y="499" width="0" height="16" rx="4"/>
+      </g>
+
+      <!-- Hjärtat -->
+      <g id="kort-hjarta">
+        <rect class="kort" x="690" y="205" width="220" height="138" rx="16"/>
+        <text class="rubrik" x="712" y="240">Hjärtat</text>
+        <text class="roll dim" x="888" y="240" text-anchor="end">målorgan</text>
+        <g transform="translate(742 292)" aria-hidden="true">
+          <path id="hjarta-ikon" class="f-blod" transform="scale(2.1) translate(-12 -12)" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </g>
+        <text id="puls-tal" x="888" y="302" text-anchor="end">70</text>
+        <text class="roll dim" x="888" y="326" text-anchor="end">slag/min</text>
+      </g>
+
+      <!-- Sensorer -->
+      <g class="plats" data-plats="2" role="button" tabindex="-1" aria-label="Lägg till sensorer">
+        <rect x="50" y="228" width="230" height="92" rx="16"/>
+        <text x="165" y="280" text-anchor="middle">+ Sensorer</text>
+      </g>
+      <g id="kort-sensor" data-fran="2">
+        <rect class="kort" x="50" y="228" width="230" height="92" rx="16"/>
+        <g transform="translate(72 256)" aria-hidden="true">
+          <circle cx="16" cy="16" r="15" fill="none" class="s-nerv" stroke-width="2" opacity=".45"/>
+          <circle cx="16" cy="16" r="9" fill="none" class="s-nerv" stroke-width="2" opacity=".75"/>
+          <circle cx="16" cy="16" r="3.5" class="f-nerv"/>
+        </g>
+        <text class="rubrik" x="118" y="270">Sensorer</text>
+        <text class="roll dim" x="118" y="294">känner av syret</text>
+      </g>
+
+      <!-- Förlängda märgen -->
+      <g class="plats" data-plats="3" role="button" tabindex="-1" aria-label="Lägg till förlängda märgen">
+        <rect x="350" y="28" width="260" height="92" rx="16"/>
+        <text x="480" y="80" text-anchor="middle">+ Förlängda märgen</text>
+      </g>
+      <g id="kort-marg" data-fran="3">
+        <rect class="kort" x="350" y="28" width="260" height="92" rx="16"/>
+        <g transform="translate(368 46)" aria-hidden="true">
+          <path d="M19 2C9 2 2 8 2 16c0 6 5 10 12 10h4V16h12C30 8 27 2 19 2z" class="f-dim" opacity=".45"/>
+          <rect x="15" y="22" width="9" height="30" rx="4.5" class="f-nerv"/>
+        </g>
+        <text class="rubrik" x="412" y="70">Förlängda märgen</text>
+        <text class="roll dim" x="412" y="94">styrcentrum</text>
+      </g>
+
+      <!-- Nerverna till hjärtat -->
+      <g class="plats" data-plats="4" role="button" tabindex="-1" aria-label="Lägg till nerver till hjärtat">
+        <path d="M610 56 Q830 56 830 197"/>
+        <path d="M610 92 Q770 92 770 197"/>
+        <text x="796" y="46" text-anchor="middle">+ Nerver</text>
+      </g>
+
+      <!-- Vad som händer just nu, mitt i slingan -->
+      <g aria-live="polite">
+        <text id="lage1" x="480" y="258" text-anchor="middle">Syret räcker</text>
+        <text id="lage2" class="dim" x="480" y="288" text-anchor="middle"></text>
+      </g>
+      <text class="roll dim" data-fran="4" x="480" y="344" text-anchor="middle">↻ negativ återkoppling</text>
+    </svg>
+
+    <div class="reglage">
+      <label for="arbete">Musklernas arbete</label>
+      <input type="range" id="arbete" min="0" max="100" step="1" value="0">
+      <div class="skala" aria-hidden="true"><span>Vila</span><span>Promenad</span><span>Löpning</span></div>
+    </div>
+  </section>
+
+  <aside class="sida">
+    <ol class="panel steg" id="steg" aria-label="Bygg upp slingan"></ol>
+    <section class="panel kurva" id="kurva" hidden>
+      <h2>Pulsen över tid</h2>
+      <svg id="graf" viewBox="0 0 320 168" role="img" aria-label="Kurva över pulsen och musklernas arbete den senaste stunden">
+        <line class="rutnat" x1="34" x2="314" y1="104.3" y2="104.3"/><text x="28" y="108" text-anchor="end">70</text>
+        <line class="rutnat" x1="34" x2="314" y1="65" y2="65"/><text x="28" y="69" text-anchor="end">120</text>
+        <line class="rutnat" x1="34" x2="314" y1="25.7" y2="25.7"/><text x="28" y="29.7" text-anchor="end">170</text>
+        <polygon id="graf-arbete" points=""/>
+        <polyline id="graf-puls" points=""/>
+        <text x="34" y="164">musklernas arbete</text>
+        <text x="314" y="164" text-anchor="end">tid →</text>
+      </svg>
+    </section>
+  </aside>
+</main>
+
+<dialog id="om" aria-labelledby="om-rubrik">
+  <h2 id="om-rubrik">Om modellen</h2>
+  <ul>
+    <li>Modellen är förenklad för att visa principen: en störning, en sensor, ett styrcentrum, ett målorgan och en slinga som sluts.</li>
+    <li>Tiden går fortare än i verkligheten. I kroppen tar det någon minut för pulsen att ställa in sig, och längre än så att återhämta sig.</li>
+    <li>Här står pulsen still på 70 tills slingan är sluten. Ett hjärta helt utan nerver slår i sin egen takt, ungefär 100 slag/min. Vilopulsen är lägre eftersom parasympatikus bromsar hela tiden.</li>
+    <li>Sensorerna (kemoreceptorer) känner i verkligheten mest av koldioxid och pH i blodet, som ändras när musklerna arbetar. Pulsen styrs också av blodtrycket, av signaler från muskler och leder, av hjärnans egna förberedelser inför rörelse och av adrenalin.</li>
+    <li>Hjärtat pumpar också mer blod per slag vid arbete. Här ändras bara pulsen.</li>
+  </ul>
+  <form method="dialog"><button class="knapp" type="submit">Stäng</button></form>
+</dialog>
+
+<script>
+// ---------------------------------------------------------------------
+// Tema: ljust eller mörkt (samma nyckel som i de andra apparna)
+// ---------------------------------------------------------------------
+const Tema = (() => {
+  const NYCKEL = 'kemiappar-tema';
+  const sparat = () => { try { const t = localStorage.getItem(NYCKEL); return t === 'ljust' || t === 'morkt' ? t : null; } catch (e) { return null; } };
+  const system = () => matchMedia('(prefers-color-scheme: light)').matches ? 'ljust' : 'morkt';
+  const rot = document.documentElement;
+  const aktuellt = () => rot.dataset.tema === 'ljust' ? 'ljust' : 'morkt';
+  function init() {
+    const knapp = document.getElementById('tema-knapp');
+    const satt = t => {
+      rot.dataset.tema = t;
+      const text = t === 'ljust' ? 'Byt till mörkt tema' : 'Byt till ljust tema';
+      knapp.setAttribute('aria-label', text);
+      knapp.title = text;
+    };
+    satt(aktuellt());
+    knapp.addEventListener('click', () => {
+      const t = aktuellt() === 'ljust' ? 'morkt' : 'ljust';
+      try { localStorage.setItem(NYCKEL, t); } catch (e) { /* privat läge: valet gäller bara den här sidan */ }
+      satt(t);
+    });
+    matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (!sparat()) satt(system()); });
+    window.addEventListener('storage', e => { if (e.key === NYCKEL) satt(sparat() || system()); });
+  }
+  return { init };
+})();
+
+// ---------------------------------------------------------------------
+// Modellen
+// ---------------------------------------------------------------------
+// Musklernas behov av syre och det syre blodet levererar räknas i andelar av
+// vilovärdet (1 = vila). Leveransen följer pulsen. När slingan är sluten
+// (steg 4) ändrar förlängda märgen pulsen så länge behov och leverans skiljer
+// sig åt; annars står pulsen på vilovärdet.
+const VILOPULS = 70, MAXBEHOV = 2.5;
+const klamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const Modell = {
+  steg: 1,        // 1 muskler och hjärta, 2 + sensorer, 3 + förlängda märgen, 4 + nerver (sluten slinga)
+  arbete: 0,      // 0 vila … 1 löpning
+  behov: 1,
+  puls: VILOPULS,
+  get leverans() { return this.puls / VILOPULS; },
+  get skillnad() { return this.behov - this.leverans; },       // > 0: för lite syre
+  // Nervernas aktivitet, 0–1. Bromsen släpper först, sedan ökar gasen.
+  get broms() { return klamp((100 - this.puls) / 30, 0, 1); },
+  get gas() { return klamp((this.puls - 75) / 105, 0, 1); },
+  stega(dt) {
+    const mal = 1 + (MAXBEHOV - 1) * this.arbete;
+    this.behov += (mal - this.behov) * Math.min(1, dt / 0.4);
+    if (this.steg >= 4) {
+      const e = this.skillnad;
+      this.puls += VILOPULS * e * dt / (e > 0 ? 2.2 : 4);        // återhämtningen går långsammare
+    } else {
+      this.puls += (VILOPULS - this.puls) * Math.min(1, dt / 2);
+    }
+    this.puls = klamp(this.puls, 50, 185);
+  },
+};
+
+// ---------------------------------------------------------------------
+// Stegen: en del i taget
+// ---------------------------------------------------------------------
+const STEG = [
+  { titel: 'Musklerna och hjärtat',
+    text: ['Hjärtat pumpar blod med syre till musklerna. Hårt arbete kräver mer syre.'],
+    prova: 'Dra reglaget mot löpning. Räcker syret?',
+    nasta: 'Lägg till sensorer' },
+  { titel: 'Sensorer',
+    text: ['Sensorer i blodkärlen känner av när syret inte räcker. Då skickar de nervsignaler.'],
+    prova: 'Öka arbetet igen. Vart tar signalen vägen?',
+    nasta: 'Lägg till förlängda märgen' },
+  { titel: 'Förlängda märgen',
+    text: ['Förlängda märgen i hjärnstammen är styrcentrum. Den tar emot signalerna och bestämmer hur fort hjärtat ska slå.'],
+    prova: 'Öka arbetet. Når beskedet fram till hjärtat?',
+    nasta: 'Lägg till nerver till hjärtat' },
+  { titel: 'Nerver till hjärtat',
+    text: ['Två nerver styr hjärtat: sympatikus <span class="ord-gas">gasar</span> och parasympatikus <span class="ord-broms">bromsar</span>.',
+           'Nu är slingan sluten. För lite syre ger högre puls, som ger mer syre.'],
+    prova: 'Dra till löpning, vänta, och gå sedan tillbaka till vila.',
+    efter: 'Välj ett tidigare steg för att bryta slingan.' },
+];
+
+const $ = id => document.getElementById(id);
+const stegLista = $('steg');
+STEG.forEach((s, i) => {
+  const li = document.createElement('li');
+  li.innerHTML =
+    `<button class="steg-rubrik" type="button"><span class="nr">${i + 1}</span><span>${s.titel}</span></button>` +
+    `<div class="steg-text">${s.text.map(t => `<p>${t}</p>`).join('')}<p class="prova">${s.prova}</p>` +
+    (s.nasta ? `<button class="knapp primar" type="button">＋ ${s.nasta}</button>` : `<p>${s.efter}</p>`) + `</div>`;
+  li.querySelector('.steg-rubrik').addEventListener('click', () => sattSteg(i + 1));
+  const nasta = li.querySelector('.primar');
+  if (nasta) nasta.addEventListener('click', () => sattSteg(i + 2));
+  stegLista.appendChild(li);
+});
+
+function sattSteg(n) {
+  Modell.steg = klamp(n, 1, STEG.length);
+  [...stegLista.children].forEach((li, i) => {
+    li.classList.toggle('nu', i + 1 === Modell.steg);
+    li.classList.toggle('klar', i + 1 < Modell.steg);
+    const b = li.querySelector('.steg-rubrik');
+    if (i + 1 === Modell.steg) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('[data-fran]').forEach(el => el.classList.toggle('syns', Modell.steg >= +el.dataset.fran));
+  document.querySelectorAll('[data-plats]').forEach(el => {
+    const nasta = Modell.steg === +el.dataset.plats - 1;
+    el.classList.toggle('syns', nasta);
+    el.setAttribute('tabindex', nasta ? '0' : '-1');
+  });
+  $('kurva').hidden = Modell.steg < 4;
+  rita(0);
+}
+document.querySelectorAll('[data-plats]').forEach(el => {
+  const lagg = () => sattSteg(+el.dataset.plats);
+  el.addEventListener('click', lagg);
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); lagg(); } });
+});
+
+// ---------------------------------------------------------------------
+// Reglaget
+// ---------------------------------------------------------------------
+const reglage = $('arbete');
+function lasReglage() {
+  Modell.arbete = reglage.value / 100;
+  reglage.style.setProperty('--p', reglage.value + '%');
+  const ord = reglage.value < 20 ? 'vila' : reglage.value < 70 ? 'promenad' : 'löpning';
+  reglage.setAttribute('aria-valuetext', ord);
+}
+reglage.addEventListener('input', lasReglage);
+
+// ---------------------------------------------------------------------
+// Ritningen
+// ---------------------------------------------------------------------
+// Signaler och blod visas som prickar som vandrar längs vägarna. Hur tydligt
+// prickarna syns visar hur stark signalen är just nu.
+const SVGNS = 'http://www.w3.org/2000/svg';
+function prickrad(vagId, klass, antal, radie) {
+  const vag = $(vagId), langd = vag.getTotalLength(), prickar = [];
+  for (let i = 0; i < antal; i++) {
+    const c = document.createElementNS(SVGNS, 'circle');
+    c.setAttribute('r', radie);
+    c.setAttribute('class', klass);
+    $('prickar').appendChild(c);
+    prickar.push(c);
+  }
+  let fas = 0;
+  return (dt, fart, styrka) => {
+    fas = (fas + dt * fart) % 1;
+    prickar.forEach((c, i) => {
+      const t = (fas + i / antal) % 1, p = vag.getPointAtLength(t * langd);
+      c.setAttribute('cx', p.x.toFixed(1));
+      c.setAttribute('cy', p.y.toFixed(1));
+      c.setAttribute('opacity', (styrka * Math.min(1, t * 8, (1 - t) * 8)).toFixed(2));
+    });
+    vag.dataset.styrka = styrka;
+  };
+}
+const prickBlod = prickrad('p-blod', 'f-blod', 5, 5.5);
+const prickSens = prickrad('p-sens', 'f-nerv', 5, 4.5);
+const prickGas = prickrad('p-gas', 'f-gas', 5, 4.5);
+const prickBroms = prickrad('p-broms', 'f-broms', 5, 4.5);
+
+const GRANS = 0.05;          // mindre skillnad än så räknas som balans
+const STAPEL = 172 / 2.6;    // pixlar per andel av vilobehovet
+const historik = [];         // { puls, arbete }, en punkt per tiondels sekund
+let sedanPunkt = 0, hjartfas = 0;
+const lugnt = matchMedia('(prefers-reduced-motion: reduce)');
+
+function lagestext() {
+  const e = Modell.skillnad, s = Modell.steg;
+  if (e > GRANS) {
+    return ['För lite syre', ['pulsen ändras inte', 'signalen når ingen', 'signalen når inte hjärtat', '→ pulsen ökar'][s - 1]];
+  }
+  if (s >= 4 && e < -GRANS) return ['Mer syre än det behövs', '→ pulsen sjunker'];
+  return s >= 4 ? ['I balans', 'syret räcker precis'] : ['Syret räcker', ''];
+}
+
+function rita(dt) {
+  const m = Modell, e = m.skillnad;
+  // Musklernas staplar
+  const behov = m.behov * STAPEL, far = m.leverans * STAPEL;
+  $('stapel-behov').setAttribute('width', behov.toFixed(1));
+  $('stapel-far').setAttribute('width', far.toFixed(1));
+  $('brist').setAttribute('x', (450 + far).toFixed(1));
+  $('brist').setAttribute('width', Math.max(0, behov - far).toFixed(1));
+  // Hjärtat
+  $('puls-tal').textContent = Math.round(m.puls);
+  hjartfas = (hjartfas + dt * m.puls / 60) % 1;
+  const slag = lugnt.matches ? 1 : 1 + 0.14 * Math.exp(-hjartfas * 7);
+  $('hjarta-ikon').setAttribute('transform', `scale(${(2.1 * slag).toFixed(3)}) translate(-12 -12)`);
+  // Signaler
+  const obalans = m.steg >= 2 ? klamp(Math.abs(e) * 3, 0, 1) : 0;
+  prickBlod(dt, 0.25 * m.leverans, 0.95);
+  prickSens(dt, 0.6, obalans);
+  prickGas(dt, 0.6, m.steg >= 4 ? m.gas : 0);
+  prickBroms(dt, 0.6, m.steg >= 4 ? m.broms : 0);
+  $('p-sens').setAttribute('opacity', (0.3 + 0.7 * obalans).toFixed(2));
+  $('p-gas').setAttribute('opacity', (0.25 + 0.75 * m.gas).toFixed(2));
+  $('p-broms').setAttribute('opacity', (0.25 + 0.75 * m.broms).toFixed(2));
+  $('kort-sensor').classList.toggle('aktiv', obalans > 0.15);
+  $('kort-marg').classList.toggle('aktiv', m.steg >= 3 && obalans > 0.15);
+  // Läget i ord
+  const [rad1, rad2] = lagestext();
+  if ($('lage1').textContent !== rad1) $('lage1').textContent = rad1;
+  if ($('lage2').textContent !== rad2) $('lage2').textContent = rad2;
+  // Kurvan
+  sedanPunkt += dt;
+  if (sedanPunkt >= 0.1 || !historik.length) {
+    sedanPunkt = 0;
+    historik.push({ puls: m.puls, arbete: m.arbete });
+    if (historik.length > 400) historik.shift();
+  }
+  if (m.steg >= 4) {
+    const n = historik.length, x = i => 314 - (n - 1 - i) * 0.7;
+    const yPuls = p => 104.3 - (p - 70) * 0.786, yArb = a => 150 - a * 22;
+    $('graf-puls').setAttribute('points', historik.map((h, i) => `${x(i).toFixed(1)},${yPuls(h.puls).toFixed(1)}`).join(' '));
+    $('graf-arbete').setAttribute('points',
+      `${x(0).toFixed(1)},150 ` + historik.map((h, i) => `${x(i).toFixed(1)},${yArb(h.arbete).toFixed(1)}`).join(' ') + ' 314,150');
+  }
+}
+
+let forra = null;
+function bildruta(nu) {
+  const dt = forra === null ? 0 : Math.min(0.05, (nu - forra) / 1000);
+  forra = nu;
+  Modell.stega(dt);
+  rita(dt);
+  requestAnimationFrame(bildruta);
+}
+
+Tema.init();
+$('om-knapp').addEventListener('click', () => $('om').showModal());
+lasReglage();
+sattSteg(1);
+requestAnimationFrame(bildruta);
+
+// För testerna: modellen och stegbytet.
+window.Puls = { Modell, sattSteg, rita };
+</script>
+</body>
+</html>
