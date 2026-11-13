@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pulsslingan 0.1</title>
-<meta name="description" content="Bygg upp regleringen av pulsen en del i taget och se hur kroppen kompenserar när musklerna arbetar.">
+<meta name="description" content="Bygg upp regleringen av pulsen en del i taget och se hur kroppen håller koldioxidhalten nere när musklerna arbetar.">
 <script id="tema-start">
   // Tema före första ritningen, så att sidan inte blinkar till i fel tema.
   // Ett sparat val (temaknappen) gäller i alla apparna på webbplatsen;
@@ -18,7 +18,7 @@
   })();
 </script>
 <style>
-  /* Fyra färger bär betydelse, och bara de: blod/syre, sensorisk signal, gas och broms. */
+  /* Fyra färger bär betydelse, och bara de: blod, sensorisk signal, gas och broms. */
   :root {
     --bg:        #0b1016;
     --bg2:       #121a23;
@@ -150,7 +150,7 @@
   #lage1 { font-size: 23px; font-weight: 650; }
   #lage2 { font-size: 19px; }
   .stapel-bak { fill: var(--bg2); stroke: var(--border); }
-  #brist { fill: none; stroke: var(--blod); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  #brist { fill: var(--blod); fill-opacity: .4; }
 
   /* ---------- Stegen ---------- */
   .sida { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
@@ -231,7 +231,7 @@
 <main>
   <section class="panel bild" aria-label="Regleringen av pulsen">
     <svg id="scen" viewBox="0 0 960 560" role="img" aria-labelledby="scen-titel">
-      <title id="scen-titel">Slingan som reglerar pulsen: musklerna, sensorer, förlängda märgen och hjärtat</title>
+      <title id="scen-titel">Slingan som reglerar koldioxidhalten och pulsen: musklerna, sensorer, förlängda märgen och hjärtat</title>
       <defs>
         <marker id="pil-blod" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" class="f-blod"/></marker>
         <marker id="pil-nerv" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" class="f-nerv"/></marker>
@@ -243,7 +243,7 @@
       <!-- Vägarna ritas först, så att korten ligger ovanpå ändarna. -->
       <g id="vag-blod">
         <path id="p-blod" class="vag s-blod" d="M800 343 Q800 472 652 472" stroke-width="9" opacity=".3" marker-end="url(#pil-blod)"/>
-        <text class="etikett f-blod" x="814" y="424">blod med syre</text>
+        <text class="etikett f-blod" x="814" y="424">blodflöde</text>
       </g>
       <g data-fran="2">
         <path class="vag s-dim" d="M320 472 Q165 472 165 330" stroke-width="2" stroke-dasharray="2 7" marker-end="url(#pil-dim)"/>
@@ -268,13 +268,15 @@
           <path d="M8 9.5v9M15 7.5v13M22 9.5v9" stroke="var(--bg3)" stroke-width="1.6"/>
         </g>
         <text class="rubrik" x="380" y="437">Musklerna</text>
-        <text class="roll dim" x="342" y="478">Behöver syre</text>
+        <text class="roll dim" x="342" y="478">Bildar CO₂</text>
         <rect class="stapel-bak" x="450" y="465" width="172" height="16" rx="4"/>
         <rect id="stapel-behov" class="f-dim" x="450" y="465" width="66" height="16" rx="4"/>
-        <text class="roll dim" x="342" y="512">Får syre</text>
+        <text class="roll dim" x="342" y="512">CO₂ i blodet</text>
         <rect class="stapel-bak" x="450" y="499" width="172" height="16" rx="4"/>
         <rect id="stapel-far" class="f-blod" x="450" y="499" width="66" height="16" rx="4"/>
         <rect id="brist" x="516" y="499" width="0" height="16" rx="4"/>
+        <line id="normal-streck" x1="516" x2="516" y1="494" y2="521" class="s-dim" stroke-width="2"/>
+        <text class="dim" x="516" y="536" text-anchor="middle" font-size="12">normalt</text>
       </g>
 
       <!-- Hjärtat -->
@@ -302,7 +304,7 @@
           <circle cx="16" cy="16" r="3.5" class="f-nerv"/>
         </g>
         <text class="rubrik" x="118" y="270">Sensorer</text>
-        <text class="roll dim" x="118" y="294">känner av syret</text>
+        <text class="roll dim" x="118" y="294">känner av CO₂</text>
       </g>
 
       <!-- Förlängda märgen -->
@@ -329,7 +331,7 @@
 
       <!-- Vad som händer just nu, mitt i slingan -->
       <g aria-live="polite">
-        <text id="lage1" x="480" y="258" text-anchor="middle">Syret räcker</text>
+        <text id="lage1" x="480" y="258" text-anchor="middle">Normal CO₂-halt</text>
         <text id="lage2" class="dim" x="480" y="288" text-anchor="middle"></text>
       </g>
       <text class="roll dim" data-fran="4" x="480" y="344" text-anchor="middle">↻ negativ återkoppling</text>
@@ -365,8 +367,8 @@
     <li>Modellen är förenklad för att visa principen: en störning, en sensor, ett styrcentrum, ett målorgan och en slinga som sluts.</li>
     <li>Tiden går fortare än i verkligheten. I kroppen tar det någon minut för pulsen att ställa in sig, och längre än så att återhämta sig.</li>
     <li>Här står pulsen still på 70 tills slingan är sluten. Ett hjärta helt utan nerver slår i sin egen takt, ungefär 100 slag/min. Vilopulsen är lägre eftersom parasympatikus bromsar hela tiden.</li>
-    <li>Sensorerna (kemoreceptorer) känner i verkligheten mest av koldioxid och pH i blodet, som ändras när musklerna arbetar. Pulsen styrs också av blodtrycket, av signaler från muskler och leder, av hjärnans egna förberedelser inför rörelse och av adrenalin.</li>
-    <li>Hjärtat pumpar också mer blod per slag vid arbete. Här ändras bara pulsen.</li>
+    <li>Sensorerna är kemoreceptorer. De känner av koldioxid och därmed pH i blodet: mer koldioxid ger lägre pH. Syrehalten ändras mycket mindre vid arbete.</li>
+    <li>Koldioxiden förs i verkligheten bort av andningen också, som ökar vid arbete. Här ingår bara hjärtats del. Pulsen styrs dessutom av blodtrycket, av signaler från muskler och leder, av hjärnans förberedelser inför rörelse och av adrenalin, och hjärtat pumpar mer blod per slag vid arbete.</li>
   </ul>
   <form method="dialog"><button class="knapp" type="submit">Stäng</button></form>
 </dialog>
@@ -404,25 +406,28 @@ const Tema = (() => {
 // ---------------------------------------------------------------------
 // Modellen
 // ---------------------------------------------------------------------
-// Musklernas behov av syre och det syre blodet levererar räknas i andelar av
-// vilovärdet (1 = vila). Leveransen följer pulsen. När slingan är sluten
-// (steg 4) ändrar förlängda märgen pulsen så länge behov och leverans skiljer
-// sig åt; annars står pulsen på vilovärdet.
+// Musklerna bildar koldioxid (behov, i andelar av vilovärdet: 1 = vila) och
+// blodet för bort den i takt med pulsen. Koldioxidhalten i blodet (co2, 1 = normalt)
+// stiger när det bildas mer än vad som förs bort. När slingan är sluten (steg 4)
+// ändrar förlängda märgen pulsen så länge halten avviker från det normala;
+// annars står pulsen på vilovärdet.
 const VILOPULS = 70, MAXBEHOV = 2.5;
 const klamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const Modell = {
   steg: 1,        // 1 muskler och hjärta, 2 + sensorer, 3 + förlängda märgen, 4 + nerver (sluten slinga)
   arbete: 0,      // 0 vila … 1 löpning
-  behov: 1,
+  behov: 1,       // musklernas bildning av koldioxid
+  co2: 1,         // koldioxidhalt i blodet
   puls: VILOPULS,
-  get leverans() { return this.puls / VILOPULS; },
-  get skillnad() { return this.behov - this.leverans; },       // > 0: för lite syre
+  get leverans() { return this.puls / VILOPULS; },             // bortförsel per enhet koldioxid
+  get skillnad() { return this.co2 - 1; },                     // > 0: för mycket koldioxid
   // Nervernas aktivitet, 0–1. Bromsen släpper först, sedan ökar gasen.
   get broms() { return klamp((100 - this.puls) / 30, 0, 1); },
   get gas() { return klamp((this.puls - 75) / 105, 0, 1); },
   stega(dt) {
     const mal = 1 + (MAXBEHOV - 1) * this.arbete;
     this.behov += (mal - this.behov) * Math.min(1, dt / 0.4);
+    this.co2 += (this.behov - this.leverans * this.co2) * Math.min(1, dt / 0.5);
     if (this.steg >= 4) {
       const e = this.skillnad;
       this.puls += VILOPULS * e * dt / (e > 0 ? 2.2 : 4);        // återhämtningen går långsammare
@@ -438,11 +443,11 @@ const Modell = {
 // ---------------------------------------------------------------------
 const STEG = [
   { titel: 'Musklerna och hjärtat',
-    text: ['Hjärtat pumpar blod med syre till musklerna. Hårt arbete kräver mer syre.'],
-    prova: 'Dra reglaget mot löpning. Räcker syret?',
+    text: ['Musklerna bildar koldioxid, och blodet från hjärtat för bort den. Hårt arbete ger mer koldioxid.'],
+    prova: 'Dra reglaget mot löpning. Vad händer med koldioxidhalten?',
     nasta: 'Lägg till sensorer' },
   { titel: 'Sensorer',
-    text: ['Sensorer i blodkärlen känner av när syret inte räcker. Då skickar de nervsignaler.'],
+    text: ['Sensorer i blodkärlen känner av koldioxid. När halten stiger skickar de nervsignaler.'],
     prova: 'Öka arbetet igen. Vart tar signalen vägen?',
     nasta: 'Lägg till förlängda märgen' },
   { titel: 'Förlängda märgen',
@@ -451,7 +456,7 @@ const STEG = [
     nasta: 'Lägg till nerver till hjärtat' },
   { titel: 'Nerver till hjärtat',
     text: ['Två nerver styr hjärtat: sympatikus <span class="ord-gas">gasar</span> och parasympatikus <span class="ord-broms">bromsar</span>.',
-           'Nu är slingan sluten. För lite syre ger högre puls, som ger mer syre.'],
+           'Nu är slingan sluten. För mycket koldioxid ger högre puls, som för bort mer koldioxid.'],
     prova: 'Dra till löpning, vänta, och gå sedan tillbaka till vila.',
     efter: 'Välj ett tidigare steg för att bryta slingan.' },
 ];
@@ -538,7 +543,7 @@ const prickGas = prickrad('p-gas', 'f-gas', 5, 4.5);
 const prickBroms = prickrad('p-broms', 'f-broms', 5, 4.5);
 
 const GRANS = 0.05;          // mindre skillnad än så räknas som balans
-const STAPEL = 172 / 2.6;    // pixlar per andel av vilobehovet
+const STAPEL = 172 / 2.6;    // pixlar per andel av vilovärdet
 const historik = [];         // { puls, arbete }, en punkt per tiondels sekund
 let sedanPunkt = 0, hjartfas = 0;
 const lugnt = matchMedia('(prefers-reduced-motion: reduce)');
@@ -546,20 +551,20 @@ const lugnt = matchMedia('(prefers-reduced-motion: reduce)');
 function lagestext() {
   const e = Modell.skillnad, s = Modell.steg;
   if (e > GRANS) {
-    return ['För lite syre', ['pulsen ändras inte', 'signalen når ingen', 'signalen når inte hjärtat', '→ pulsen ökar'][s - 1]];
+    return ['För mycket koldioxid', ['pulsen ändras inte', 'signalen når ingen', 'signalen når inte hjärtat', '→ pulsen ökar'][s - 1]];
   }
-  if (s >= 4 && e < -GRANS) return ['Mer syre än det behövs', '→ pulsen sjunker'];
-  return s >= 4 ? ['I balans', 'syret räcker precis'] : ['Syret räcker', ''];
+  if (s >= 4 && e < -GRANS) return ['För lite koldioxid', '→ pulsen sjunker'];
+  return s >= 4 ? ['I balans', 'koldioxidhalten är normal'] : ['Normal CO₂-halt', ''];
 }
 
 function rita(dt) {
   const m = Modell, e = m.skillnad;
   // Musklernas staplar
-  const behov = m.behov * STAPEL, far = m.leverans * STAPEL;
+  const behov = m.behov * STAPEL;
   $('stapel-behov').setAttribute('width', behov.toFixed(1));
-  $('stapel-far').setAttribute('width', far.toFixed(1));
-  $('brist').setAttribute('x', (450 + far).toFixed(1));
-  $('brist').setAttribute('width', Math.max(0, behov - far).toFixed(1));
+  $('stapel-far').setAttribute('width', Math.min(1, m.co2) * STAPEL);
+  $('brist').setAttribute('x', (450 + STAPEL).toFixed(1));
+  $('brist').setAttribute('width', Math.max(0, Math.min(172, m.co2 * STAPEL) - STAPEL).toFixed(1));
   // Hjärtat
   $('puls-tal').textContent = Math.round(m.puls);
   hjartfas = (hjartfas + dt * m.puls / 60) % 1;
