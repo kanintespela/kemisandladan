@@ -38,7 +38,7 @@ I fritt bygge bygger eleven på en tom duk med egna storheter, källor, förlust
 
 ## Pulsslingan
 
-Regleringen av pulsen, uppbyggd en del i taget: musklerna och hjärtat, sensorerna, förlängda märgen och nerverna till hjärtat (sympatikus som gas, parasympatikus som broms). Det finns ett enda reglage, musklernas arbete. Innan slingan är sluten ger arbete en syrebrist som ingen gör något åt; när den är sluten stiger pulsen tills syret räcker och faller tillbaka i vila. Appen är gjord för att förstås snabbt: lite text, få delar på skärmen åt gången och ett tidigare steg som sätt att bryta slingan.
+Regleringen av pulsen, uppbyggd en del i taget: musklerna och hjärtat, sensorerna, förlängda märgen och nerverna till hjärtat (sympatikus som gas, parasympatikus som broms). Det finns ett enda reglage, musklernas arbete. Musklerna bildar koldioxid och blodet för bort den i takt med pulsen. Innan slingan är sluten ger arbete en koldioxidhalt som bara stiger; när den är sluten känner sensorerna (kemoreceptorerna) av den, förlängda märgen höjer pulsen tills halten är normal igen, och pulsen faller tillbaka i vila. Appen är gjord för att förstås snabbt: lite text, få delar på skärmen åt gången och ett tidigare steg som sätt att bryta slingan.
 
 ## Kroppens termostat
 
